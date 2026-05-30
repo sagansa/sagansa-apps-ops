@@ -1,0 +1,18 @@
+{
+  "pages": {
+    "/auth/select-tenant/page": [
+      "static/chunks/ff1a16fafef87110.js",
+      "static/chunks/7dd66bdf8a7e5707.js",
+      "static/chunks/a7d5d0791c8c6223.css",
+      "static/chunks/713fbe9ac1473e5c.css",
+      "static/chunks/6401f131e66b5d93.js",
+      "static/chunks/9806b9dd5450d591.js",
+      "static/chunks/5d42197f764f004e.js",
+      "static/chunks/91adb7bdb9870c6a.js",
+      "static/chunks/8082ab48faca5ea1.js",
+      "static/chunks/63dba52cde864d84.js",
+      "static/chunks/2008ffcf9e5b170c.js",
+      "static/chunks/turbopack-137dca1c46dd5bf6.js"
+    ]
+  }
+}
