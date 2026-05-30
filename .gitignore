@@ -1,7 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-# /node_modules # karena menggunakan shared hosting
+/node_modules 
 /.pnp
 .pnp.*
 .yarn/*
@@ -14,7 +14,7 @@
 /coverage
 
 # next.js
-# /.next/ # karena menggunakan shared hosting 
+/.next/ 
 /out/
 
 # production
