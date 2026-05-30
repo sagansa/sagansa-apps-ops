@@ -1,7 +1,10 @@
 // API service for interacting with the Laravel backend
-const API_BASE_URL = typeof window !== 'undefined'
-  ? '/api'  // Use relative URL in browser (will be proxied by Next.js)
-  : (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api'); // Use full URL for SSR
+const configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '');
+
+const API_BASE_URL = configuredApiBaseUrl
+  || (typeof window !== 'undefined'
+    ? '/api'
+    : 'http://localhost:8000/api');
 
 export class ApiError extends Error {
   status: number;
