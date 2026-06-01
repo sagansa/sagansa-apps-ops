@@ -1,43 +1,45 @@
 {
-  "[project]/src/app/products/ProductsClient.tsx [app-client] (ecmascript, next/dynamic entry)": {
-    "id": "[project]/src/app/products/ProductsClient.tsx [app-client] (ecmascript, next/dynamic entry)",
+  "10835": {
+    "id": 10835,
     "files": [
-      "static/chunks/src_3c65ddc8._.js",
-      "static/chunks/node_modules_d5531e09._.js",
-      "static/chunks/node_modules_7fb97d43._.css",
-      "static/chunks/src_app_products_ProductsClient_tsx_ad11b555._.js"
+      "static/chunks/bf15d42b7e01b1cf.js",
+      "static/chunks/0ca1c73a49ff63a4.js",
+      "static/chunks/1f700dcefc0dce05.js"
     ]
   },
-  "[project]/src/app/stores/receipt-config/ReceiptConfigContent.tsx [app-client] (ecmascript, next/dynamic entry)": {
-    "id": "[project]/src/app/stores/receipt-config/ReceiptConfigContent.tsx [app-client] (ecmascript, next/dynamic entry)",
+  "5384": {
+    "id": 5384,
     "files": [
-      "static/chunks/src_8094d825._.js",
-      "static/chunks/node_modules_fc35c329._.js",
-      "static/chunks/src_app_stores_receipt-config_ReceiptConfigContent_tsx_ad11b555._.js"
+      "static/chunks/29b22f9c2e913379.js",
+      "static/chunks/0ca1c73a49ff63a4.js",
+      "static/chunks/1f700dcefc0dce05.js"
     ]
   },
-  "[project]/src/app/customer-types/CustomerTypesClient.tsx [app-client] (ecmascript, next/dynamic entry)": {
-    "id": "[project]/src/app/customer-types/CustomerTypesClient.tsx [app-client] (ecmascript, next/dynamic entry)",
+  "67274": {
+    "id": 67274,
     "files": [
-      "static/chunks/src_8f03b9b9._.js",
-      "static/chunks/node_modules_ab7c5ed0._.js",
-      "static/chunks/src_app_customer-types_CustomerTypesClient_tsx_ad11b555._.js"
+      "static/chunks/d2f9e73586e6049b.js",
+      "static/chunks/0ca1c73a49ff63a4.js",
+      "static/chunks/1f700dcefc0dce05.js"
     ]
   },
-  "[project]/src/app/tables/TablesClient.tsx [app-client] (ecmascript, next/dynamic entry)": {
-    "id": "[project]/src/app/tables/TablesClient.tsx [app-client] (ecmascript, next/dynamic entry)",
+  "60040": {
+    "id": 60040,
     "files": [
-      "static/chunks/src_337adac2._.js",
-      "static/chunks/node_modules_c18e5bb3._.js",
-      "static/chunks/src_app_tables_TablesClient_tsx_ad11b555._.js"
+      "static/chunks/2fed7a8a9c155b29.js",
+      "static/chunks/4b438cf6a2ef8728.js",
+      "static/chunks/324842c0f80e9628.js",
+      "static/chunks/b79479df07633838.js",
+      "static/chunks/0ca1c73a49ff63a4.js",
+      "static/chunks/b02b2308dfcb04a9.css"
     ]
   },
-  "[project]/src/app/categories/CategoriesClient.tsx [app-client] (ecmascript, next/dynamic entry)": {
-    "id": "[project]/src/app/categories/CategoriesClient.tsx [app-client] (ecmascript, next/dynamic entry)",
+  "9265": {
+    "id": 9265,
     "files": [
-      "static/chunks/src_4835e69e._.js",
-      "static/chunks/node_modules_5dacbe18._.js",
-      "static/chunks/src_app_categories_CategoriesClient_tsx_ad11b555._.js"
+      "static/chunks/1d0eddb259185dfc.js",
+      "static/chunks/0ca1c73a49ff63a4.js",
+      "static/chunks/1f700dcefc0dce05.js"
     ]
   }
 }

@@ -1,10 +1,10 @@
 {
-  "[project]/src/app/shift-schedules/ShiftSchedulesContent.tsx [app-client] (ecmascript, next/dynamic entry)": {
-    "id": "[project]/src/app/shift-schedules/ShiftSchedulesContent.tsx [app-client] (ecmascript, next/dynamic entry)",
+  "15035": {
+    "id": 15035,
     "files": [
-      "static/chunks/src_d1614f88._.js",
-      "static/chunks/node_modules_ab7c5ed0._.js",
-      "static/chunks/src_app_shift-schedules_ShiftSchedulesContent_tsx_3c5c1903._.js"
+      "static/chunks/2dcc7c3715759a99.js",
+      "static/chunks/0ca1c73a49ff63a4.js",
+      "static/chunks/1f700dcefc0dce05.js"
     ]
   }
 }
