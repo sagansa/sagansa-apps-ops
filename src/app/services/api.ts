@@ -1,10 +1,23 @@
 // API service for interacting with the Laravel backend
 const configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '');
 
-const API_BASE_URL = configuredApiBaseUrl
-  || (typeof window !== 'undefined'
-    ? '/api'
-    : 'http://localhost:8000/api');
+const getApiBaseUrl = () => {
+  if (configuredApiBaseUrl) {
+    return configuredApiBaseUrl;
+  }
+
+  if (typeof window !== 'undefined') {
+    if (window.location.hostname === 'ops.sagansa.id') {
+      return 'https://api-ops.sagansa.id/api';
+    }
+
+    return '/api';
+  }
+
+  return 'http://localhost:8000/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 export class ApiError extends Error {
   status: number;
