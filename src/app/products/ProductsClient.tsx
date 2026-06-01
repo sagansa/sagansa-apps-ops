@@ -198,7 +198,6 @@ export default function ProductsClient() {
         await apiService.createProduct(payload);
       }
       await loadProducts('refresh');
-      handleCloseForm();
     } catch (err) {
       setFormError(getErrorMessage(err, 'Failed to save product.'));
       throw err;

@@ -9,6 +9,7 @@ import {
   ProductVariantGroupInput,
   ProductModification,
   ProductModificationInput,
+  ProductPriceInput,
 } from '@/app/services/api';
 import apiService from '@/app/services/api';
 import { getErrorMessage } from '@/app/utils/error';
@@ -45,6 +46,12 @@ type CombinationFormState = {
   stock: string;
   sku: string;
   isActive: boolean;
+};
+
+type CustomerTypeOption = {
+  id: string;
+  name: string;
+  is_active?: boolean;
 };
 
 interface ProductFormProps {
@@ -125,6 +132,9 @@ const ProductForm = ({
   const [localError, setLocalError] = useState<string | null>(null);
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [editingGroupIndex, setEditingGroupIndex] = useState<number | null>(null);
+  const [customerTypesByStore, setCustomerTypesByStore] = useState<Record<string, CustomerTypeOption[]>>({});
+  const [channelPrices, setChannelPrices] = useState<Record<string, Record<string, string>>>({});
+  const [channelPricesLoading, setChannelPricesLoading] = useState(false);
 
   // ...
 
@@ -141,6 +151,8 @@ const ProductForm = ({
       setRemoveImage(false);
       setStoreSelections({});
       setStoreSelectionsInitialized(false);
+      setCustomerTypesByStore({});
+      setChannelPrices({});
       setCategoryId('');
       return;
     }
@@ -208,6 +220,8 @@ const ProductForm = ({
       setModifications([]);
       setStoreSelections({});
       setStoreSelectionsInitialized(false);
+      setCustomerTypesByStore({});
+      setChannelPrices({});
     }
   }, [isOpen, product]);
 
@@ -260,6 +274,66 @@ const ProductForm = ({
     setStoreSelections(initial);
     setStoreSelectionsInitialized(true);
   }, [isOpen, product, stores, storeSelectionsInitialized]);
+
+  useEffect(() => {
+    if (!isOpen || !product?.id || !storeSelectionsInitialized) {
+      return;
+    }
+
+    const selectedStoreIds = Object.entries(storeSelections)
+      .filter(([, state]) => state.selected)
+      .map(([storeId]) => storeId);
+
+    if (selectedStoreIds.length === 0) {
+      setCustomerTypesByStore({});
+      setChannelPrices({});
+      return;
+    }
+
+    let cancelled = false;
+    setChannelPricesLoading(true);
+
+    Promise.all(selectedStoreIds.map(async (storeId) => {
+      const [types, prices] = await Promise.all([
+        apiService.getCustomerTypes(storeId),
+        apiService.getProductPrices({ storeId, productId: product.id }),
+      ]);
+
+      return { storeId, types, prices };
+    }))
+      .then((results) => {
+        if (cancelled) return;
+
+        const nextTypes: Record<string, CustomerTypeOption[]> = {};
+        const nextPrices: Record<string, Record<string, string>> = {};
+
+        results.forEach(({ storeId, types, prices }) => {
+          nextTypes[storeId] = (types as CustomerTypeOption[]).filter((type) => type.is_active !== false);
+          nextPrices[storeId] = {};
+
+          prices.forEach((priceRow) => {
+            nextPrices[storeId][buildChannelPriceKey(priceRow.variantId ?? null, priceRow.customerTypeId)] = String(priceRow.price);
+          });
+        });
+
+        setCustomerTypesByStore(nextTypes);
+        setChannelPrices(nextPrices);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          console.error('Failed to load channel prices', err);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setChannelPricesLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, product?.id, storeSelections, storeSelectionsInitialized]);
 
   // Auto-generate combinations whenever variant groups change (Realtime like Shopee)
   useEffect(() => {
@@ -424,6 +498,83 @@ const ProductForm = ({
     });
   };
 
+  const buildChannelPriceKey = (variantId: string | null, customerTypeId: string) => `${variantId ?? 'base'}:${customerTypeId}`;
+
+  const handleChannelPriceChange = (storeId: string, variantId: string | null, customerTypeId: string, value: string) => {
+    const cleaned = value.replace(/[^0-9]/g, '');
+    const key = buildChannelPriceKey(variantId, customerTypeId);
+
+    setChannelPrices((prev) => ({
+      ...prev,
+      [storeId]: {
+        ...(prev[storeId] ?? {}),
+        [key]: cleaned,
+      },
+    }));
+  };
+
+  const getChannelPriceTargets = () => {
+    const targets = [
+      {
+        variantId: null as string | null,
+        name: 'Harga dasar',
+        basePrice: price !== '' ? Number(price) : product?.price ?? 0,
+      },
+    ];
+
+    (product?.variantCombinations ?? []).forEach((combination) => {
+      targets.push({
+        variantId: combination.id,
+        name: combination.name,
+        basePrice: combination.price,
+      });
+    });
+
+    return targets;
+  };
+
+  const saveChannelPrices = async () => {
+    if (!product?.id) {
+      return;
+    }
+
+    const selectedStoreIds = Object.entries(storeSelections)
+      .filter(([, state]) => state.selected)
+      .map(([storeId]) => storeId);
+
+    await Promise.all(selectedStoreIds.map((storeId) => {
+      const types = customerTypesByStore[storeId] ?? [];
+      const prices: ProductPriceInput[] = [];
+
+      if (types.length === 0) {
+        return Promise.resolve([]);
+      }
+
+      getChannelPriceTargets().forEach((target) => {
+        types.forEach((type) => {
+          const value = channelPrices[storeId]?.[buildChannelPriceKey(target.variantId, type.id)] ?? '';
+
+          if (value !== '') {
+            prices.push({
+              store_id: storeId,
+              product_id: product.id,
+              variant_id: target.variantId,
+              customer_type_id: type.id,
+              price: Number(value),
+              is_active: true,
+            });
+          }
+        });
+      });
+
+      return apiService.saveProductPrices({
+        storeId,
+        productId: product.id,
+        prices,
+      });
+    }));
+  };
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLocalError(null);
@@ -494,6 +645,8 @@ const ProductForm = ({
 
     try {
       await onSubmit(payload);
+      await saveChannelPrices();
+      onClose();
     } catch (err) {
       setLocalError(getErrorMessage(err, 'Failed to save product.'));
     }
@@ -810,6 +963,92 @@ const ProductForm = ({
                 </p>
               </section>
             )}
+
+            <section className="space-y-3 rounded-xl border border-gray-200 p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">Harga Channel</h3>
+                  <p className="mt-1 text-xs text-gray-600">
+                    Berlaku untuk customer type seperti Gojek, Grab, dan ShopeeFood.
+                  </p>
+                </div>
+                {channelPricesLoading && (
+                  <span className="text-xs text-gray-500">Loading...</span>
+                )}
+              </div>
+
+              {!product ? (
+                <p className="rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                  Simpan produk terlebih dahulu untuk mengatur harga channel.
+                </p>
+              ) : Object.entries(storeSelections).filter(([, state]) => state.selected).length === 0 ? (
+                <p className="rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                  Pilih store pada Availability untuk mengatur harga channel.
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {Object.entries(storeSelections)
+                    .filter(([, state]) => state.selected)
+                    .map(([storeId]) => {
+                      const store = stores.find((item) => item.id === storeId);
+                      const customerTypes = customerTypesByStore[storeId] ?? [];
+                      const targets = getChannelPriceTargets();
+
+                      return (
+                        <div key={storeId} className="overflow-hidden rounded-lg border border-gray-200">
+                          <div className="border-b border-gray-200 bg-gray-50 px-3 py-2">
+                            <p className="text-sm font-medium text-gray-900">{store?.nickname || store?.name || 'Store'}</p>
+                          </div>
+
+                          {customerTypes.length === 0 ? (
+                            <p className="px-3 py-3 text-sm text-gray-600">Belum ada customer type aktif untuk store ini.</p>
+                          ) : (
+                            <div className="overflow-x-auto">
+                              <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-white">
+                                  <tr>
+                                    <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Harga</th>
+                                    <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Default</th>
+                                    {customerTypes.map((type) => (
+                                      <th key={type.id} className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                        {type.name}
+                                      </th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100 bg-white">
+                                  {targets.map((target) => (
+                                    <tr key={target.variantId ?? 'base'}>
+                                      <td className="px-3 py-2 text-sm font-medium text-gray-900">{target.name}</td>
+                                      <td className="px-3 py-2 text-sm text-gray-600">Rp {Number(target.basePrice || 0).toLocaleString('id-ID')}</td>
+                                      {customerTypes.map((type) => {
+                                        const key = buildChannelPriceKey(target.variantId, type.id);
+                                        return (
+                                          <td key={type.id} className="px-3 py-2">
+                                            <Input
+                                              type="number"
+                                              min="0"
+                                              step="100"
+                                              value={channelPrices[storeId]?.[key] ?? ''}
+                                              onChange={(e) => handleChannelPriceChange(storeId, target.variantId, type.id, e.target.value)}
+                                              placeholder="Default"
+                                              className="w-32"
+                                            />
+                                          </td>
+                                        );
+                                      })}
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </section>
 
             <section className="space-y-3 rounded-xl border border-gray-200 p-4">
               <div className="flex items-center justify-between">

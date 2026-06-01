@@ -453,6 +453,30 @@ class ApiService {
     });
   }
 
+  async getProductPrices(params: { storeId: string; productId?: string; customerTypeId?: string }) {
+    const searchParams = new URLSearchParams({ store_id: params.storeId });
+    if (params.productId) searchParams.set('product_id', params.productId);
+    if (params.customerTypeId) searchParams.set('customer_type_id', params.customerTypeId);
+
+    const response = await this.request(`/product-prices?${searchParams.toString()}`);
+    const rows = (response as { data?: ApiProductPricePayload[] }).data;
+    return Array.isArray(rows) ? rows.map(normaliseProductPrice) : [];
+  }
+
+  async saveProductPrices(input: { storeId: string; productId: string; prices: ProductPriceInput[] }) {
+    const response = await this.request('/product-prices/bulk', {
+      method: 'POST',
+      body: JSON.stringify({
+        store_id: input.storeId,
+        product_id: input.productId,
+        prices: input.prices,
+      }),
+    });
+
+    const rows = (response as { data?: ApiProductPricePayload[] }).data;
+    return Array.isArray(rows) ? rows.map(normaliseProductPrice) : [];
+  }
+
   async createStore(tenantId: string, storeData: StoreInput) {
     const response = await this.request(`/tenants/${tenantId}/stores`, {
       method: 'POST',
@@ -1091,6 +1115,27 @@ export interface ProductVariantCombination {
   updatedAt?: string;
 }
 
+export interface ProductPrice {
+  id: string;
+  storeId: string;
+  productId: string;
+  variantId?: string | null;
+  customerTypeId: string;
+  price: number;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ProductPriceInput {
+  store_id: string;
+  product_id: string;
+  variant_id?: string | null;
+  customer_type_id: string;
+  price: number;
+  is_active?: boolean;
+}
+
 export interface ProductVariantGroup {
   id: string;
   name: string;
@@ -1132,6 +1177,7 @@ export interface Product {
   variants?: ProductVariant[];
   variantGroups?: ProductVariantGroup[];
   variantCombinations?: ProductVariantCombination[];
+  productPrices?: ProductPrice[];
   modifications?: ProductModification[];
   createdAt?: string;
   updatedAt?: string;
@@ -1576,6 +1622,18 @@ interface ApiProductVariantCombinationPayload {
   updated_at?: string | null;
 }
 
+interface ApiProductPricePayload {
+  id: string;
+  store_id: string;
+  product_id: string;
+  variant_id?: string | null;
+  customer_type_id: string;
+  price: number | string;
+  is_active?: boolean;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
 interface ApiProductModificationPayload {
   id: string;
   name: string;
@@ -1609,6 +1667,7 @@ interface ApiProductPayload {
   variants?: ApiProductVariantPayload[] | null;
   variant_groups?: ApiProductVariantGroupPayload[] | null;
   variant_combinations?: ApiProductVariantCombinationPayload[] | null;
+  product_prices?: ApiProductPricePayload[] | null;
   modifications?: ApiProductModificationPayload[] | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -1829,6 +1888,10 @@ function normaliseProduct(product: ApiProductPayload): Product {
     }))
     : undefined;
 
+  const productPrices = Array.isArray(product.product_prices)
+    ? product.product_prices.map(normaliseProductPrice)
+    : undefined;
+
   return {
     id: String(product.id ?? ''),
     name: String(product.name ?? ''),
@@ -1853,9 +1916,26 @@ function normaliseProduct(product: ApiProductPayload): Product {
     variants,
     variantGroups,
     variantCombinations,
+    productPrices,
     modifications,
     createdAt: product.created_at ?? undefined,
     updatedAt: product.updated_at ?? undefined,
+  };
+}
+
+function normaliseProductPrice(price: ApiProductPricePayload): ProductPrice {
+  const parsedPrice = typeof price.price === 'number' ? price.price : Number(price.price);
+
+  return {
+    id: String(price.id ?? ''),
+    storeId: String(price.store_id ?? ''),
+    productId: String(price.product_id ?? ''),
+    variantId: price.variant_id ?? null,
+    customerTypeId: String(price.customer_type_id ?? ''),
+    price: Number.isFinite(parsedPrice) ? parsedPrice : 0,
+    isActive: typeof price.is_active === 'boolean' ? price.is_active : true,
+    createdAt: price.created_at ?? undefined,
+    updatedAt: price.updated_at ?? undefined,
   };
 }
 
