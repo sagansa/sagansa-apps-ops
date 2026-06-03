@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import apiService from '@/app/services/api';
 import { getErrorMessage } from '@/app/utils/error';
+import { Button } from '@/components/ui/button';
 
 function PasswordResetContent({ params }: { params: { token: string } }) {
   const token = params.token;
@@ -115,13 +116,13 @@ function PasswordResetContent({ params }: { params: { token: string } }) {
             </div>
 
             <div>
-              <button
+              <Button
                 type="submit"
                 disabled={loading}
-                className="w-full inline-flex justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-60"
+                className="w-full"
               >
                 {loading ? 'Menyimpan...' : 'Reset Password'}
-              </button>
+              </Button>
             </div>
           </form>
 

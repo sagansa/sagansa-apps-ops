@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import apiService from '@/app/services/api';
 import { getErrorMessage } from '@/app/utils/error';
+import { Button } from '@/components/ui/button';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -69,13 +70,13 @@ export default function ForgotPasswordPage() {
             </div>
 
             <div>
-              <button
+              <Button
                 type="submit"
                 disabled={loading}
-                className="w-full inline-flex justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-60"
+                className="w-full"
               >
                 {loading ? 'Mengirim...' : 'Kirim Link Reset'}
-              </button>
+              </Button>
             </div>
           </form>
 
