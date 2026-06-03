@@ -88,6 +88,7 @@ function StoresContent() {
   };
 
   const activeTenantId = activeTenant?.id;
+  const getStoreDisplayName = (store: Store) => store.nickname?.trim() || store.name;
 
   const handleSubmit = async (payload: StoreInput) => {
     if (!activeTenantId) {
@@ -252,7 +253,9 @@ function StoresContent() {
                 ) : filteredStores.length > 0 ? (
                   filteredStores.map((store) => (
                     <tr key={store.id}>
-                      <td className="px-6 py-4 text-sm font-medium text-gray-900">{store.name}</td>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                        {getStoreDisplayName(store)}
+                      </td>
                       <td className="px-6 py-4 text-sm text-gray-500">
                         {store.nickname ?? <span className="text-xs text-gray-400">Not specified</span>}
                       </td>
@@ -382,9 +385,9 @@ function StoresContent() {
           onClose={() => setQrStore(null)}
           tenantId={activeTenantId}
           storeId={qrStore.id}
-          storeName={qrStore.name}
+          storeName={getStoreDisplayName(qrStore)}
           tableCode="STORE"
-          title={`QR Store ${qrStore.name}`}
+          title={`QR Store ${getStoreDisplayName(qrStore)}`}
         />
       )}
     </AdminLayout >

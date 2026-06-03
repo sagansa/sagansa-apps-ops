@@ -238,7 +238,7 @@ export default function CustomerTypesClient() {
                     <SelectContent>
                         {stores.map((store) => (
                             <SelectItem key={store.id} value={store.id}>
-                                {store.name}
+                                {store.nickname || store.name}
                             </SelectItem>
                         ))}
                     </SelectContent>

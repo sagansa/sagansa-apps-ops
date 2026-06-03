@@ -67,7 +67,7 @@ export default function AttendanceFilters({ filters, onFiltersChange }: Attendan
             <option value="">All Stores</option>
             {stores.map((store) => (
               <option key={store.id} value={store.id}>
-                {store.name}
+                {store.nickname || store.name}
               </option>
             ))}
           </select>

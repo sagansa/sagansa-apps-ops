@@ -3,7 +3,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/app/contexts/AuthContext';
 import apiService from '@/app/services/api';
-import { Button, ConfirmationDialog, Modal, Select } from '@/components/ui';
+import {
+    Button,
+    ConfirmationDialog,
+    Modal,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui';
 import { Plus, Pencil, QrCode, Trash2 } from 'lucide-react';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -27,6 +36,7 @@ type Table = {
 type StoreOption = {
     id: string;
     name: string;
+    nickname?: string | null;
 };
 
 export default function TablesClient() {
@@ -207,18 +217,17 @@ export default function TablesClient() {
                 <label htmlFor="store-select" className="text-sm font-medium text-gray-700">
                     Store:
                 </label>
-                <Select
-                    id="store-select"
-                    value={selectedStore}
-                    onChange={(e) => setSelectedStore(e.target.value)}
-                    className="max-w-xs"
-                >
-                    <option value="" disabled>Select a store</option>
-                    {stores.map((store) => (
-                        <option key={store.id} value={store.id}>
-                            {store.name}
-                        </option>
-                    ))}
+                <Select value={selectedStore} onValueChange={setSelectedStore}>
+                    <SelectTrigger id="store-select" className="w-[280px]">
+                        <SelectValue placeholder="Select a store" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {stores.map((store) => (
+                            <SelectItem key={store.id} value={store.id}>
+                                {store.nickname || store.name}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
                 </Select>
             </div>
 
@@ -380,9 +389,13 @@ export default function TablesClient() {
                     onClose={() => setQrTarget(null)}
                     tenantId={activeTenant?.id || ''}
                     storeId={selectedStoreOption?.id || ''}
-                    storeName={selectedStoreOption?.name || 'Store'}
+                    storeName={selectedStoreOption?.nickname || selectedStoreOption?.name || 'Store'}
                     tableCode={qrTarget === 'store' ? 'STORE' : qrTarget?.table_number}
-                    title={qrTarget === 'store' || !qrTarget ? 'QR Store' : `QR Meja ${qrTarget.table_number}`}
+                    title={
+                        qrTarget === 'store' || !qrTarget
+                            ? `QR Store ${selectedStoreOption?.nickname || selectedStoreOption?.name || ''}`.trim()
+                            : `QR Meja ${qrTarget.table_number}`
+                    }
                 />
             )}
         </div>

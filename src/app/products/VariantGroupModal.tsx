@@ -44,13 +44,28 @@ export function VariantGroupModal({ isOpen, group, onSave, onClose }: VariantGro
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                    {group ? 'Edit Variant Group' : 'Add Variant Group'}
-                </h2>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4 py-8">
+            <div className="flex w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+                <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+                    <div>
+                        <h2 className="text-lg font-semibold text-gray-900">
+                            {group ? 'Edit Variant Group' : 'Add Variant Group'}
+                        </h2>
+                        <p className="text-xs text-gray-600">Kelola grup dan pilihan variasi produk.</p>
+                    </div>
+                    <Button
+                        type="button"
+                        onClick={handleClose}
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label="Close"
+                    >
+                        <span className="sr-only">Close</span>
+                        &#10005;
+                    </Button>
+                </div>
 
-                <div className="space-y-4">
+                <div className="space-y-4 px-6 py-5">
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                             Group Name
@@ -73,25 +88,22 @@ export function VariantGroupModal({ isOpen, group, onSave, onClose }: VariantGro
                             onChange={setVariantTags}
                             placeholder="Type option name and press Enter (e.g. Small, Medium, Large)"
                         />
-                        <p className="text-xs text-gray-500 mt-1">
-                            Press Enter to add each option. Press Backspace to remove last.
-                        </p>
                     </div>
 
                     {variantTags.length > 0 && (
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                            <p className="text-xs text-blue-700">
-                                ✨ <strong>{variantTags.length} options</strong> will create combinations with other groups
+                        <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+                            <p className="text-xs text-gray-600">
+                                <strong>{variantTags.length} options</strong> will create combinations with other groups.
                             </p>
                         </div>
                     )}
                 </div>
 
-                <div className="flex justify-end gap-3 mt-6">
+                <div className="flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
                     <Button
                         type="button"
                         onClick={handleClose}
-                        className="bg-gray-200 text-gray-700 hover:bg-gray-300"
+                        variant="outline"
                     >
                         Cancel
                     </Button>
@@ -99,7 +111,6 @@ export function VariantGroupModal({ isOpen, group, onSave, onClose }: VariantGro
                         type="button"
                         onClick={handleSave}
                         disabled={!groupName.trim() || variantTags.length === 0}
-                        className="bg-amber-600 text-white hover:bg-amber-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
                     >
                         {group ? 'Update' : 'Add'} Group
                     </Button>

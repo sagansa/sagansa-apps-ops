@@ -31,7 +31,7 @@ export function TagInput({ tags, onChange, placeholder = 'Press Enter to add' }:
     };
 
     return (
-        <div className="flex flex-wrap gap-2 p-2 border border-gray-300 rounded-lg bg-white focus-within:border-amber-500 focus-within:ring-1 focus-within:ring-amber-500">
+        <div className="flex flex-wrap gap-2 rounded-md border border-gray-300 bg-white p-2 shadow-sm focus-within:border-gray-900 focus-within:ring-1 focus-within:ring-gray-900">
             {tags.map((tag, index) => (
                 <span
                     key={index}

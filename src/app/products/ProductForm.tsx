@@ -125,6 +125,7 @@ const ProductForm = ({
   const [localError, setLocalError] = useState<string | null>(null);
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [editingGroupIndex, setEditingGroupIndex] = useState<number | null>(null);
+  const allStoresSelected = stores.length > 0 && stores.every((store) => storeSelections[store.id]?.selected);
 
   // ...
 
@@ -411,6 +412,23 @@ const ProductForm = ({
     });
   };
 
+  const toggleAllStores = () => {
+    setStoreSelections((prev) => {
+      const shouldSelectAll = !stores.every((store) => prev[store.id]?.selected);
+      const next: Record<string, StoreSelectionState> = {};
+
+      stores.forEach((store) => {
+        const current = prev[store.id] ?? { selected: false, price: '' };
+        next[store.id] = {
+          ...current,
+          selected: shouldSelectAll,
+        };
+      });
+
+      return next;
+    });
+  };
+
   const handleStorePriceChange = (storeId: string, value: string) => {
     const cleaned = value.replace(/[^0-9]/g, '');
     setStoreSelections((prev) => {
@@ -670,7 +688,7 @@ const ProductForm = ({
                             type="checkbox"
                             checked={group.isRequired}
                             onChange={(e) => handleVariantGroupChange(index, 'isRequired', e.target.checked)}
-                            className="h-3 w-3 rounded border-gray-300 text-amber-600 focus:ring-amber-600"
+                            className="h-3 w-3 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
                           />
                           <span>Required Selection</span>
                         </label>
@@ -681,7 +699,7 @@ const ProductForm = ({
                           variant="ghost"
                           size="sm"
                           onClick={() => handleEditGroup(index)}
-                          className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                          className="text-gray-700 hover:bg-gray-100"
                         >
                           Edit Options
                         </Button>
@@ -717,7 +735,7 @@ const ProductForm = ({
                   type="button"
                   variant="outline"
                   onClick={handleAddGroup}
-                  className="w-full border-dashed border-2 border-gray-300 text-gray-600 hover:border-amber-500 hover:text-amber-600 py-3"
+                  className="w-full border-dashed border-2 border-gray-300 text-gray-700 hover:border-gray-500 py-3"
                 >
                   + Add Variant Group
                 </Button>
@@ -740,7 +758,7 @@ const ProductForm = ({
 
             {/* Realtime Variant Combinations Table (Shopee Style) */}
             {combinations.length > 0 && (
-              <section className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <section className="space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-4">
                 <div className="flex items-start justify-between">
                   <div>
                     <h3 className="text-sm font-semibold text-gray-900">Daftar Variasi</h3>
@@ -797,7 +815,7 @@ const ProductForm = ({
                               type="checkbox"
                               checked={combo.isActive}
                               onChange={(e) => handleCombinationChange(index, 'isActive', e.target.checked)}
-                              className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-600"
+                              className="h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
                             />
                           </td>
                         </tr>
@@ -806,8 +824,8 @@ const ProductForm = ({
                   </table>
                 </div>
 
-                <p className="text-xs text-green-700 italic">
-                  ✨ Realtime: Combinations auto-update saat Anda ubah variant groups!
+                <p className="text-xs text-gray-600 italic">
+                  Combinations auto-update saat Anda ubah variant groups.
                 </p>
               </section>
             )}
@@ -817,9 +835,8 @@ const ProductForm = ({
                 <h3 className="text-sm font-semibold text-gray-900">Modifications</h3>
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
-                  className="text-amber-600 hover:text-amber-700"
                   onClick={() => setModifications((prev) => [...prev, defaultModification()])}
                 >
                   Add Modification
@@ -828,44 +845,44 @@ const ProductForm = ({
               {modifications.length === 0 ? (
                 <p className="text-sm text-gray-600">No modifications defined.</p>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {modifications.map((modification, index) => (
-                    <div key={`modification-${index}`} className="rounded-lg border border-gray-200 p-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="grid w-full grid-cols-1 gap-3 md:grid-cols-2">
+                    <div key={`modification-${index}`} className="rounded-md border border-gray-200 bg-white p-2">
+                      <div className="grid items-center gap-2 md:grid-cols-[minmax(0,1fr)_160px_96px_80px]">
+                        <div className="min-w-0">
                           <Input
                             value={modification.name}
                             onChange={(e) => handleModificationChange(index, 'name', e.target.value)}
                             placeholder="Modification name"
-                          />
-                          <Input
-                            type="number"
-                            min="0"
-                            value={modification.price}
-                            onChange={(e) => handleModificationChange(index, 'price', e.target.value)}
-                            placeholder="Additional price"
+                            className="h-9"
                           />
                         </div>
-                        <div className="flex flex-col items-end space-y-2">
-                          <label className="inline-flex items-center space-x-2 text-xs text-gray-600">
-                            <Checkbox
-                              checked={modification.isActive}
-                              onCheckedChange={(checked) =>
-                                handleModificationChange(index, 'isActive', checked === true)
-                              }
-                            />
-                            <span>Active</span>
-                          </label>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="text-red-500 hover:text-red-600"
-                            onClick={() => setModifications((prev) => prev.filter((_, idx) => idx !== index))}
-                          >
-                            Remove
-                          </Button>
-                        </div>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={modification.price}
+                          onChange={(e) => handleModificationChange(index, 'price', e.target.value)}
+                          placeholder="Additional price"
+                          className="h-9"
+                        />
+                        <label className="inline-flex h-9 items-center space-x-2 rounded-md border border-gray-100 px-2 text-xs text-gray-600">
+                          <Checkbox
+                            checked={modification.isActive}
+                            onCheckedChange={(checked) =>
+                              handleModificationChange(index, 'isActive', checked === true)
+                            }
+                          />
+                          <span>Active</span>
+                        </label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-9 text-red-500 hover:text-red-600"
+                          onClick={() => setModifications((prev) => prev.filter((_, idx) => idx !== index))}
+                        >
+                          Remove
+                        </Button>
                       </div>
                     </div>
                   ))}
@@ -874,8 +891,18 @@ const ProductForm = ({
             </section>
 
             <section className="space-y-3 rounded-xl border border-gray-200 p-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-3">
                 <h3 className="text-sm font-semibold text-gray-900">Availability</h3>
+                {stores.length > 0 && (
+                  <label className="inline-flex items-center space-x-2 rounded-md border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700">
+                    <Checkbox
+                      checked={allStoresSelected}
+                      onCheckedChange={toggleAllStores}
+                      disabled={storesLoading}
+                    />
+                    <span>Select all</span>
+                  </label>
+                )}
               </div>
               {storesLoading ? (
                 <p className="text-sm text-gray-600">Loading store list...</p>

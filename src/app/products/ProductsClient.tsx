@@ -262,7 +262,7 @@ export default function ProductsClient() {
               <SelectItem value="all">All Stores</SelectItem>
               {stores.map((store) => (
                 <SelectItem key={store.id} value={store.id}>
-                  {store.name}
+                  {store.nickname || store.name}
                 </SelectItem>
               ))}
             </SelectContent>

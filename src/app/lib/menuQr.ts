@@ -1,5 +1,9 @@
+const configuredMenuBaseUrl = process.env.NEXT_PUBLIC_MENU_BASE_URL;
+
 export const DEFAULT_MENU_BASE_URL =
-  process.env.NEXT_PUBLIC_MENU_BASE_URL || 'http://localhost:3002';
+  configuredMenuBaseUrl && !configuredMenuBaseUrl.includes('api-ops.sagansa.id')
+    ? configuredMenuBaseUrl
+    : 'https://menu.sagansa.id';
 
 type BuildMenuOrderUrlParams = {
   baseUrl: string;

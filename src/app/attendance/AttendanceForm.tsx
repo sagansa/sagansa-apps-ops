@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Attendance, AttendanceCreateInput, Store, ShiftStore } from '../services/api';
+import { Attendance, AttendanceCreateInput } from '../services/api';
 import { useStoreContext } from '../contexts/StoreContext';
 import { useShiftStoreContext } from '../contexts/ShiftStoreContext';
 
@@ -156,7 +156,7 @@ export default function AttendanceForm({
                   <option value="">Select a store</option>
                   {stores.map((store) => (
                     <option key={store.id} value={store.id}>
-                      {store.name}
+                      {store.nickname || store.name}
                     </option>
                   ))}
                 </select>
@@ -333,4 +333,3 @@ export default function AttendanceForm({
     </div>
   );
 }
-
