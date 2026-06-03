@@ -9,7 +9,6 @@ import {
   ProductVariantGroupInput,
   ProductModification,
   ProductModificationInput,
-  ProductPriceInput,
 } from '@/app/services/api';
 import apiService from '@/app/services/api';
 import { getErrorMessage } from '@/app/utils/error';
@@ -46,12 +45,6 @@ type CombinationFormState = {
   stock: string;
   sku: string;
   isActive: boolean;
-};
-
-type CustomerTypeOption = {
-  id: string;
-  name: string;
-  is_active?: boolean;
 };
 
 interface ProductFormProps {
@@ -132,9 +125,6 @@ const ProductForm = ({
   const [localError, setLocalError] = useState<string | null>(null);
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [editingGroupIndex, setEditingGroupIndex] = useState<number | null>(null);
-  const [customerTypesByStore, setCustomerTypesByStore] = useState<Record<string, CustomerTypeOption[]>>({});
-  const [channelPrices, setChannelPrices] = useState<Record<string, Record<string, string>>>({});
-  const [channelPricesLoading, setChannelPricesLoading] = useState(false);
 
   // ...
 
@@ -151,8 +141,6 @@ const ProductForm = ({
       setRemoveImage(false);
       setStoreSelections({});
       setStoreSelectionsInitialized(false);
-      setCustomerTypesByStore({});
-      setChannelPrices({});
       setCategoryId('');
       return;
     }
@@ -220,8 +208,6 @@ const ProductForm = ({
       setModifications([]);
       setStoreSelections({});
       setStoreSelectionsInitialized(false);
-      setCustomerTypesByStore({});
-      setChannelPrices({});
     }
   }, [isOpen, product]);
 
@@ -274,66 +260,6 @@ const ProductForm = ({
     setStoreSelections(initial);
     setStoreSelectionsInitialized(true);
   }, [isOpen, product, stores, storeSelectionsInitialized]);
-
-  useEffect(() => {
-    if (!isOpen || !product?.id || !storeSelectionsInitialized) {
-      return;
-    }
-
-    const selectedStoreIds = Object.entries(storeSelections)
-      .filter(([, state]) => state.selected)
-      .map(([storeId]) => storeId);
-
-    if (selectedStoreIds.length === 0) {
-      setCustomerTypesByStore({});
-      setChannelPrices({});
-      return;
-    }
-
-    let cancelled = false;
-    setChannelPricesLoading(true);
-
-    Promise.all(selectedStoreIds.map(async (storeId) => {
-      const [types, prices] = await Promise.all([
-        apiService.getCustomerTypes(storeId),
-        apiService.getProductPrices({ storeId, productId: product.id }),
-      ]);
-
-      return { storeId, types, prices };
-    }))
-      .then((results) => {
-        if (cancelled) return;
-
-        const nextTypes: Record<string, CustomerTypeOption[]> = {};
-        const nextPrices: Record<string, Record<string, string>> = {};
-
-        results.forEach(({ storeId, types, prices }) => {
-          nextTypes[storeId] = (types as CustomerTypeOption[]).filter((type) => type.is_active !== false);
-          nextPrices[storeId] = {};
-
-          prices.forEach((priceRow) => {
-            nextPrices[storeId][buildChannelPriceKey(priceRow.customerTypeId)] = String(priceRow.price);
-          });
-        });
-
-        setCustomerTypesByStore(nextTypes);
-        setChannelPrices(nextPrices);
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          console.error('Failed to load channel prices', err);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setChannelPricesLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isOpen, product?.id, storeSelections, storeSelectionsInitialized]);
 
   // Auto-generate combinations whenever variant groups change (Realtime like Shopee)
   useEffect(() => {
@@ -498,60 +424,6 @@ const ProductForm = ({
     });
   };
 
-  const buildChannelPriceKey = (customerTypeId: string) => customerTypeId;
-
-  const handleChannelPriceChange = (storeId: string, customerTypeId: string, value: string) => {
-    const cleaned = value.replace(/[^0-9]/g, '');
-    const key = buildChannelPriceKey(customerTypeId);
-
-    setChannelPrices((prev) => ({
-      ...prev,
-      [storeId]: {
-        ...(prev[storeId] ?? {}),
-        [key]: cleaned,
-      },
-    }));
-  };
-
-  const saveChannelPrices = async () => {
-    if (!product?.id) {
-      return;
-    }
-
-    const selectedStoreIds = Object.entries(storeSelections)
-      .filter(([, state]) => state.selected)
-      .map(([storeId]) => storeId);
-
-    await Promise.all(selectedStoreIds.map((storeId) => {
-      const types = customerTypesByStore[storeId] ?? [];
-      const prices: ProductPriceInput[] = [];
-
-      if (types.length === 0) {
-        return Promise.resolve([]);
-      }
-
-      types.forEach((type) => {
-        const value = channelPrices[storeId]?.[buildChannelPriceKey(type.id)] ?? '';
-
-        if (value !== '') {
-          prices.push({
-            store_id: storeId,
-            product_id: product.id,
-            customer_type_id: type.id,
-            price: Number(value),
-            is_active: true,
-          });
-        }
-      });
-
-      return apiService.saveProductPrices({
-        storeId,
-        productId: product.id,
-        prices,
-      });
-    }));
-  };
-
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLocalError(null);
@@ -622,7 +494,6 @@ const ProductForm = ({
 
     try {
       await onSubmit(payload);
-      await saveChannelPrices();
       onClose();
     } catch (err) {
       setLocalError(getErrorMessage(err, 'Failed to save product.'));
@@ -1005,77 +876,36 @@ const ProductForm = ({
             <section className="space-y-3 rounded-xl border border-gray-200 p-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-gray-900">Availability</h3>
-                {channelPricesLoading && (
-                  <span className="text-xs text-gray-500">Loading channel prices...</span>
-                )}
               </div>
               {storesLoading ? (
                 <p className="text-sm text-gray-600">Loading store list...</p>
               ) : stores.length === 0 ? (
                 <p className="text-sm text-gray-600">No stores available.</p>
               ) : (
-                <div className="grid max-h-80 grid-cols-1 gap-3 overflow-y-auto border border-gray-100 p-3 lg:grid-cols-2">
+                <div className="grid max-h-56 grid-cols-1 gap-2 overflow-y-auto border border-gray-100 p-3 sm:grid-cols-2">
                   {stores.map((store) => {
                     const selection = storeSelections[store.id] ?? { selected: false, price: '' };
-                    const customerTypes = customerTypesByStore[store.id] ?? [];
                     return (
-                      <div key={store.id} className="rounded-md border border-gray-100 p-3 hover:bg-gray-50">
-                        <div className="flex items-center justify-between gap-2">
-                          <label className="flex flex-1 items-center space-x-2 text-sm text-gray-700 cursor-pointer">
-                            <Checkbox
-                              checked={selection.selected}
-                              onCheckedChange={() => toggleStore(store.id)}
-                            />
-                            <span className="truncate" title={store.name}>{store.nickname || store.name}</span>
-                          </label>
-                          <div className="flex items-center space-x-1">
-                            <span className="text-xs text-gray-600">Rp</span>
-                            <Input
-                              type="number"
-                              min="0"
-                              value={selection.price}
-                              onChange={(e) => handleStorePriceChange(store.id, e.target.value)}
-                              disabled={!selection.selected}
-                              className="w-28 px-2 py-1"
-                              placeholder="0"
-                            />
-                          </div>
+                      <div key={store.id} className="flex items-center justify-between space-x-2 rounded-md border border-gray-100 p-2 hover:bg-gray-50">
+                        <label className="flex flex-1 items-center space-x-2 text-sm text-gray-700 cursor-pointer">
+                          <Checkbox
+                            checked={selection.selected}
+                            onCheckedChange={() => toggleStore(store.id)}
+                          />
+                          <span className="truncate" title={store.name}>{store.nickname || store.name}</span>
+                        </label>
+                        <div className="flex items-center space-x-1">
+                          <span className="text-xs text-gray-600">Rp</span>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={selection.price}
+                            onChange={(e) => handleStorePriceChange(store.id, e.target.value)}
+                            disabled={!selection.selected}
+                            className="w-28 px-2 py-1"
+                            placeholder="0"
+                          />
                         </div>
-
-                        {selection.selected && product && (
-                          <div className="mt-3 border-t border-gray-100 pt-3">
-                            <div className="mb-2 flex items-center justify-between">
-                              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Harga Channel</p>
-                              <p className="text-xs text-gray-500">Kosong = ikut harga store</p>
-                            </div>
-                            {customerTypes.length === 0 ? (
-                              <p className="text-xs text-gray-500">Belum ada customer type aktif untuk store ini.</p>
-                            ) : (
-                              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                {customerTypes.map((type) => {
-                                  const key = buildChannelPriceKey(type.id);
-                                  return (
-                                    <label key={type.id} className="space-y-1">
-                                      <span className="text-xs font-medium text-gray-600">{type.name}</span>
-                                      <div className="flex items-center space-x-1">
-                                        <span className="text-xs text-gray-500">Rp</span>
-                                        <Input
-                                          type="number"
-                                          min="0"
-                                          step="100"
-                                          value={channelPrices[store.id]?.[key] ?? ''}
-                                          onChange={(e) => handleChannelPriceChange(store.id, type.id, e.target.value)}
-                                          className="px-2 py-1"
-                                          placeholder={selection.price || '0'}
-                                        />
-                                      </div>
-                                    </label>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        )}
                       </div>
                     );
                   })}

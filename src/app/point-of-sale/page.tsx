@@ -14,8 +14,9 @@ const ProductsContent = dynamic(() => import('@/app/products/ProductsClient'), {
 const CategoriesContent = dynamic(() => import('@/app/categories/CategoriesClient'), { ssr: false });
 const TablesContent = dynamic(() => import('@/app/tables/TablesClient'), { ssr: false });
 const CustomerTypesContent = dynamic(() => import('@/app/customer-types/CustomerTypesClient'), { ssr: false });
+const ChannelPricingContent = dynamic(() => import('@/app/channel-pricing/ChannelPricingClient'), { ssr: false });
 
-type TabValue = 'receipt-config' | 'products' | 'categories' | 'tables' | 'customer-types';
+type TabValue = 'receipt-config' | 'products' | 'categories' | 'tables' | 'customer-types' | 'channel-pricing';
 
 function PointOfSaleContent() {
     const router = useRouter();
@@ -24,7 +25,7 @@ function PointOfSaleContent() {
 
     useEffect(() => {
         const tab = searchParams.get('tab') as TabValue;
-        if (tab && ['receipt-config', 'products', 'categories', 'tables', 'customer-types'].includes(tab)) {
+        if (tab && ['receipt-config', 'products', 'categories', 'tables', 'customer-types', 'channel-pricing'].includes(tab)) {
             setActiveTab(tab);
         }
     }, [searchParams]);
@@ -46,8 +47,9 @@ function PointOfSaleContent() {
                     </div>
 
                     <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-                        <TabsList className="grid w-full grid-cols-5 lg:w-auto">
+                        <TabsList className="grid w-full grid-cols-2 gap-1 md:grid-cols-3 lg:w-auto lg:grid-cols-6">
                             <TabsTrigger value="products">Products</TabsTrigger>
+                            <TabsTrigger value="channel-pricing">Channel Pricing</TabsTrigger>
                             <TabsTrigger value="categories">Categories</TabsTrigger>
                             <TabsTrigger value="receipt-config">Receipt Config</TabsTrigger>
                             <TabsTrigger value="tables">Tables</TabsTrigger>
@@ -60,6 +62,10 @@ function PointOfSaleContent() {
 
                         <TabsContent value="products" className="mt-6">
                             <ProductsContent />
+                        </TabsContent>
+
+                        <TabsContent value="channel-pricing" className="mt-6">
+                            <ChannelPricingContent />
                         </TabsContent>
 
                         <TabsContent value="categories" className="mt-6">
