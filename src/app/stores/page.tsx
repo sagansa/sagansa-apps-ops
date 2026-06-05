@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminLayout from '@/components/AdminLayout';
 import ProtectedRoute from '@/components/ProtectedRoute';
-import { Store, StoreInput, Tenant } from '@/app/services/api';
+import apiService, { Store, StoreGroup, StoreInput, Tenant } from '@/app/services/api';
 import { useAuth } from '@/app/contexts/AuthContext';
 import { TenantProvider, useTenantContext } from '@/app/contexts/TenantContext';
 import { StoreProvider, useStoreContext } from '@/app/contexts/StoreContext';
@@ -36,6 +36,7 @@ function StoresContent() {
   const [storeToDelete, setStoreToDelete] = useState<Store | null>(null);
   const [qrStore, setQrStore] = useState<Store | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [storeGroups, setStoreGroups] = useState<StoreGroup[]>([]);
 
   useEffect(() => {
     if (isSuperAdmin) {
@@ -89,6 +90,17 @@ function StoresContent() {
 
   const activeTenantId = activeTenant?.id;
   const getStoreDisplayName = (store: Store) => store.nickname?.trim() || store.name;
+
+  useEffect(() => {
+    if (!activeTenantId) {
+      setStoreGroups([]);
+      return;
+    }
+
+    apiService.getStoreGroups(activeTenantId)
+      .then(setStoreGroups)
+      .catch(() => setStoreGroups([]));
+  }, [activeTenantId]);
 
   const handleSubmit = async (payload: StoreInput) => {
     if (!activeTenantId) {
@@ -227,6 +239,9 @@ function StoresContent() {
                     Contact
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    Group
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                     Status
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
@@ -246,7 +261,7 @@ function StoresContent() {
               <tbody className="divide-y divide-gray-200 bg-white">
                 {storeLoading && filteredStores.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-6 py-8 text-center text-sm text-gray-500">
+                    <td colSpan={9} className="px-6 py-8 text-center text-sm text-gray-500">
                       <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-indigo-200 border-t-transparent" />
                     </td>
                   </tr>
@@ -265,6 +280,11 @@ function StoresContent() {
                         {!store.no_telp && !store.email ? (
                           <span className="text-xs text-gray-400">Not specified</span>
                         ) : null}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500">
+                        {storeGroups.find((group) => group.id === store.store_group_id)?.name ?? (
+                          <span className="text-xs text-gray-400">No group</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-500">
                         {store.status
@@ -342,7 +362,7 @@ function StoresContent() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={8} className="px-6 py-8 text-center text-sm text-gray-500">
+                    <td colSpan={9} className="px-6 py-8 text-center text-sm text-gray-500">
                       No stores registered for this tenant yet.
                     </td>
                   </tr>
@@ -360,6 +380,7 @@ function StoresContent() {
       <StoreForm
         tenantName={activeTenant?.name}
         store={activeStore}
+        storeGroups={storeGroups}
         isOpen={isFormOpen}
         loading={storeLoading}
         onClose={closeModal}

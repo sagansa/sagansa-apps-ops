@@ -505,6 +505,47 @@ class ApiService {
     });
   }
 
+  async getStoreGroups(tenantId: string) {
+    const response = await this.request(`/tenants/${tenantId}/store-groups`);
+    const groups = (response as { store_groups?: ApiStoreGroupPayload[] }).store_groups;
+    return Array.isArray(groups) ? groups.map(normaliseStoreGroup) : [];
+  }
+
+  async createStoreGroup(tenantId: string, input: StoreGroupInput) {
+    const response = await this.request(`/tenants/${tenantId}/store-groups`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+    if (isRecord(response) && response.success && response.store_group) {
+      response.store_group = normaliseStoreGroup(response.store_group as ApiStoreGroupPayload);
+    }
+    return response;
+  }
+
+  async updateStoreGroup(tenantId: string, groupId: string, input: StoreGroupInput) {
+    const response = await this.request(`/tenants/${tenantId}/store-groups/${groupId}`, {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    });
+    if (isRecord(response) && response.success && response.store_group) {
+      response.store_group = normaliseStoreGroup(response.store_group as ApiStoreGroupPayload);
+    }
+    return response;
+  }
+
+  async deleteStoreGroup(tenantId: string, groupId: string) {
+    return this.request(`/tenants/${tenantId}/store-groups/${groupId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async syncStoreGroupSettings(tenantId: string, groupId: string, sourceStoreId: string) {
+    return this.request(`/tenants/${tenantId}/store-groups/${groupId}/sync-settings`, {
+      method: 'POST',
+      body: JSON.stringify({ source_store_id: sourceStoreId }),
+    });
+  }
+
   // Category endpoints
   async getCategories(token?: string | null) {
     const authToken = token || this.token;
@@ -1239,6 +1280,7 @@ export interface ProductInput {
 export interface Store {
   id: string;
   tenant_id: string;
+  store_group_id?: string | null;
   name: string;
   nickname: string | null;
   no_telp: string | null;
@@ -1253,13 +1295,23 @@ export interface Store {
   service_charge_type?: 'percentage' | 'fixed';
   service_charge_rate?: number;
   service_charge_amount?: number;
-  receipt_header?: string;
-  receipt_footer?: string;
-  email_receipt_logo?: string;
-  print_receipt_logo?: string;
-  address?: string;
-  phone?: string;
+  receipt_header?: string | null;
+  receipt_footer?: string | null;
+  email_receipt_logo?: string | null;
+  print_receipt_logo?: string | null;
+  address?: string | null;
+  phone?: string | null;
   payment_methods?: PaymentMethod[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface StoreGroup {
+  id: string;
+  tenant_id: string;
+  name: string;
+  description: string | null;
+  stores: Store[];
   created_at?: string;
   updated_at?: string;
 }
@@ -1337,6 +1389,7 @@ export interface TenantUpdateInput {
 
 export interface StoreInput {
   name: string;
+  store_group_id?: string | null;
   nickname?: string | null;
   no_telp?: string | null;
   email?: string | null;
@@ -1350,6 +1403,12 @@ export interface StoreInput {
   print_receipt_logo?: File | null;
   address?: string | null;
   phone?: string | null;
+}
+
+export interface StoreGroupInput {
+  name: string;
+  description?: string | null;
+  store_ids?: string[];
 }
 
 export interface ShiftStoreInput {
@@ -1567,6 +1626,7 @@ interface ApiRolePayload {
 interface ApiStorePayload {
   id: string;
   tenant_id: string;
+  store_group_id?: string | null;
   name: string;
   nickname?: string | null;
   no_telp?: string | null;
@@ -1575,6 +1635,22 @@ interface ApiStorePayload {
   radius?: number | string | null;
   latitude?: number | string | null;
   longitude?: number | string | null;
+  receipt_header?: string | null;
+  receipt_footer?: string | null;
+  email_receipt_logo?: string | null;
+  print_receipt_logo?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface ApiStoreGroupPayload {
+  id: string;
+  tenant_id: string;
+  name: string;
+  description?: string | null;
+  stores?: ApiStorePayload[] | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -1948,6 +2024,7 @@ function normaliseStore(store: ApiStorePayload): Store {
   return {
     id: store.id,
     tenant_id: store.tenant_id,
+    store_group_id: store.store_group_id ?? null,
     name: store.name,
     nickname: store.nickname ?? null,
     no_telp: store.no_telp ?? null,
@@ -1964,6 +2041,20 @@ function normaliseStore(store: ApiStorePayload): Store {
     phone: store.phone ?? null,
     created_at: store.created_at,
     updated_at: store.updated_at,
+  };
+}
+
+function normaliseStoreGroup(group: ApiStoreGroupPayload): StoreGroup {
+  return {
+    id: group.id,
+    tenant_id: group.tenant_id,
+    name: group.name,
+    description: group.description ?? null,
+    stores: Array.isArray(group.stores)
+      ? group.stores.map((store) => normaliseStore(store))
+      : [],
+    created_at: group.created_at,
+    updated_at: group.updated_at,
   };
 }
 

@@ -42,6 +42,7 @@ const managementNavigation: NavItem[] = [
   { name: 'Users', href: '/users', role: 'super-admin' },
   { name: 'Team Members', href: '/team-members', role: 'admin' },
   { name: 'Stores', href: '/stores', role: 'admin' },
+  { name: 'Store Groups', href: '/store-groups', role: 'admin' },
   { name: 'Point of Sale', href: '/point-of-sale', role: 'admin' },
   { name: 'Shift Management', href: '/shift-management', role: 'admin' },
 ];

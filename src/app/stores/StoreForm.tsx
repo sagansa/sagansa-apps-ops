@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Store, StoreInput } from '@/app/services/api';
+import { Store, StoreGroup, StoreInput } from '@/app/services/api';
 import { getErrorMessage } from '@/app/utils/error';
 import StoreLocationPicker from './StoreLocationPicker';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 interface StoreFormProps {
   tenantName?: string;
   store?: Store;
+  storeGroups?: StoreGroup[];
   isOpen: boolean;
   loading: boolean;
   onClose: () => void;
@@ -19,6 +20,7 @@ interface StoreFormProps {
 export default function StoreForm({
   tenantName,
   store,
+  storeGroups = [],
   isOpen,
   loading,
   onClose,
@@ -27,6 +29,7 @@ export default function StoreForm({
 }: StoreFormProps) {
   const [name, setName] = useState('');
   const [nickname, setNickname] = useState('');
+  const [storeGroupId, setStoreGroupId] = useState('');
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'active' | 'inactive'>('active');
   const [radius, setRadius] = useState('');
@@ -113,6 +116,7 @@ export default function StoreForm({
     if (store) {
       setName(store.name || '');
       setNickname(store.nickname ?? '');
+      setStoreGroupId(store.store_group_id ?? '');
       setEmail(store.email ?? '');
       setStatus(store.status === 'inactive' ? 'inactive' : 'active');
       setRadius(
@@ -126,6 +130,7 @@ export default function StoreForm({
     } else {
       setName('');
       setNickname('');
+      setStoreGroupId('');
       setEmail('');
       setStatus('active');
       setRadius('');
@@ -190,6 +195,7 @@ export default function StoreForm({
 
     const payload: StoreInput = {
       name: name.trim(),
+      store_group_id: storeGroupId || null,
       nickname: nickname.trim() ? nickname.trim() : null,
       email: trimmedEmail || null,
       status,
@@ -276,6 +282,25 @@ export default function StoreForm({
                 className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
                 placeholder="Enter short reference name"
               />
+            </div>
+
+            <div>
+              <label htmlFor="store-group" className="block text-sm font-medium text-gray-700">
+                Store Group (optional)
+              </label>
+              <select
+                id="store-group"
+                value={storeGroupId}
+                onChange={(e) => setStoreGroupId(e.target.value)}
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
+              >
+                <option value="">No group</option>
+                {storeGroups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
