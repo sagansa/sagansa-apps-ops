@@ -127,7 +127,10 @@ export default function CustomerTypesClient() {
         if (selectedStore) {
             try {
                 const methods = await apiService.getPaymentMethods(selectedStore);
-                setPaymentMethods(methods || []);
+                const uniqueMethods = Array.from(
+                    new Map((methods || []).map((method: any) => [method.id || `${method.store_id}:${method.name}`, method])).values(),
+                );
+                setPaymentMethods(uniqueMethods);
             } catch (err) {
                 console.error('Failed to load payment methods:', err);
                 setPaymentMethods([]);

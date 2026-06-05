@@ -2,6 +2,17 @@
 const configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '');
 
 const getApiBaseUrl = () => {
+  if (typeof window !== 'undefined') {
+    const isLocalBrowser =
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1' ||
+      window.location.hostname === '::1';
+
+    if (isLocalBrowser && configuredApiBaseUrl?.startsWith('http')) {
+      return '/api';
+    }
+  }
+
   if (configuredApiBaseUrl) {
     return configuredApiBaseUrl;
   }
@@ -852,8 +863,13 @@ class ApiService {
   }
 
   // Payment Method endpoints
-  async getPaymentMethods(storeId: string) {
-    const response = await this.request(`/payment-methods?store_id=${storeId}`);
+  async getPaymentMethods(storeId: string, options?: { scope?: 'store' | 'group' }) {
+    const searchParams = new URLSearchParams({ store_id: storeId });
+    if (options?.scope === 'group') {
+      searchParams.set('scope', 'group');
+    }
+
+    const response = await this.request(`/payment-methods?${searchParams.toString()}`);
     if (isRecord(response) && Array.isArray((response as any).data)) {
       return (response as any).data;
     }

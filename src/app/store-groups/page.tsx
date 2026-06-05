@@ -196,7 +196,7 @@ function StoreGroupsContent() {
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Store Groups</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Group stores that should share the same menu and payment setup.
+            Group stores that should share the same menu, payment, customer type, and channel pricing setup.
           </p>
         </div>
       </div>
@@ -357,8 +357,8 @@ function StoreGroupsContent() {
                             size="icon-sm"
                             onClick={() => syncGroup(group)}
                             disabled={syncingGroupId === group.id || group.stores.length < 2}
-                            title="Sync menu and payments"
-                            aria-label="Sync menu and payments"
+                            title="Sync group settings"
+                            aria-label="Sync group settings"
                           >
                             <RefreshCw className="h-4 w-4" />
                           </Button>
