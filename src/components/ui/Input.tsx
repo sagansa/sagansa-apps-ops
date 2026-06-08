@@ -6,7 +6,15 @@ interface InputProps extends React.ComponentProps<"input"> {
   rightIcon?: React.ReactNode;
 }
 
-function Input({ className, type, leftIcon, rightIcon, ...props }: InputProps) {
+function Input({ className, type, leftIcon, rightIcon, onWheel, ...props }: InputProps) {
+  const handleWheel: React.WheelEventHandler<HTMLInputElement> = (event) => {
+    onWheel?.(event);
+
+    if (type === 'number' && !event.defaultPrevented) {
+      event.currentTarget.blur();
+    }
+  };
+
   return (
     <div className="relative">
       {leftIcon && (
@@ -25,6 +33,7 @@ function Input({ className, type, leftIcon, rightIcon, ...props }: InputProps) {
           rightIcon && "pr-10",
           className
         )}
+        onWheel={handleWheel}
         {...props}
       />
       {rightIcon && (
