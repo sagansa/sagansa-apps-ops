@@ -48,7 +48,7 @@ const managementNavigation: NavItem[] = [
 ];
 
 const salesNavigation: NavItem[] = [
-  { name: 'Point of Sale', href: '/pointOfSales', role: 'user' },
+  { name: 'Point of Sale', href: '/point-of-sale', role: 'user' },
   { name: 'Web Orders', href: '/webOrders', role: 'user' },
   // { name: 'eCommerce', href: '/eCommerce', role: 'user' },
 ];

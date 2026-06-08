@@ -21,6 +21,7 @@ import { Checkbox } from '@/components/ui/Checkbox';
 import { VariantGroupModal } from './VariantGroupModal';
 import { FormField } from '@/components/ui/FormField';
 import { FilePondUploader } from '@/components/ui/FilePondUploader';
+import { compressImageFile } from '@/app/utils/imageCompression';
 
 type VariantGroupFormState = {
   id?: string;
@@ -835,15 +836,25 @@ const ProductForm = ({
                   <div className="mt-1">
                     <FilePondUploader
                       files={filePondFiles}
-                      onUpdateFiles={(fileItems) => {
+                      onUpdateFiles={async (fileItems) => {
                         setFilePondFiles(fileItems.map((fileItem) => fileItem.file as File));
                         if (fileItems.length > 0) {
                           const file = fileItems[0].file;
                           if (file instanceof File) {
-                            setImageFile(file);
-                            setRemoveImage(false);
+                            try {
+                              const compressedFile = await compressImageFile(file);
+                              setImageFile(compressedFile);
+                              setRemoveImage(false);
+                              setLocalError(null);
+                            } catch (error) {
+                              console.error('Failed to compress product image:', error);
+                              setLocalError('Gagal memproses gambar. Coba gunakan file gambar lain.');
+                              setFilePondFiles([]);
+                              setImageFile(null);
+                            }
                           }
                         } else {
+                          setFilePondFiles([]);
                           setImageFile(null);
                           if (product?.image) {
                             setRemoveImage(true);
@@ -856,7 +867,7 @@ const ProductForm = ({
                     />
                   </div>
                   <p className="mt-1 text-xs text-gray-500">
-                    Optional. Initials will be shown if no image provided.
+                    Optional. Gambar akan dikonversi ke WebP dan dibatasi maksimal 1200x1200 px sebelum upload.
                   </p>
                 </FormField>
               </div>
