@@ -1208,12 +1208,41 @@ export interface ProductModification {
   updatedAt?: string;
 }
 
+export type ProductType = 'single' | 'bundle';
+export type BundlePricingMode = 'fixed' | 'sum_components';
+
+export interface ProductBundleComponent {
+  id: string;
+  name: string;
+  sku?: string | null;
+  price: number;
+  stock: number;
+  isActive: boolean;
+}
+
+export interface ProductBundleItem {
+  id: string;
+  bundleProductId: string;
+  componentProductId: string;
+  quantity: number;
+  sortOrder: number;
+  componentProduct?: ProductBundleComponent | null;
+}
+
+export interface ProductBundleItemInput {
+  component_product_id: string;
+  quantity: number;
+  sort_order?: number;
+}
+
 export interface Product {
   id: string;
   name: string;
   slug: string;
   description: string | null;
   category: string | null;
+  type: ProductType;
+  bundlePricingMode: BundlePricingMode;
   price: number;
   image: string | null;
   imageUrl: string | null;
@@ -1234,6 +1263,8 @@ export interface Product {
   variantCombinations?: ProductVariantCombination[];
   productPrices?: ProductPrice[];
   modifications?: ProductModification[];
+  bundleItems?: ProductBundleItem[];
+  bundleAvailableStock?: number | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -1273,6 +1304,8 @@ export interface ProductInput {
   name: string;
   slug?: string;
   description?: string | null;
+  type?: ProductType;
+  bundle_pricing_mode?: BundlePricingMode;
   price: number;
   sku: string;
   barcode?: string | null;
@@ -1289,6 +1322,7 @@ export interface ProductInput {
   variants?: ProductVariantInput[];
   variant_groups?: ProductVariantGroupInput[];
   modifications?: ProductModificationInput[];
+  bundle_items?: ProductBundleItemInput[];
   stores?: { id: string; price?: number | null }[];
   store_ids?: string[];
 }
@@ -1732,11 +1766,29 @@ interface ApiProductModificationPayload {
   updated_at?: string | null;
 }
 
+interface ApiProductBundleItemPayload {
+  id: string;
+  bundle_product_id: string;
+  component_product_id: string;
+  quantity: number | string;
+  sort_order?: number | string | null;
+  component_product?: {
+    id: string;
+    name: string;
+    sku?: string | null;
+    price?: number | string | null;
+    stock?: number | string | null;
+    is_active?: boolean;
+  } | null;
+}
+
 interface ApiProductPayload {
   id: string;
   name: string;
   slug: string;
   description?: string | null;
+  type?: string | null;
+  bundle_pricing_mode?: string | null;
   category?: string | null;
   price?: number | string | null;
   image?: string | null;
@@ -1758,6 +1810,8 @@ interface ApiProductPayload {
   variant_combinations?: ApiProductVariantCombinationPayload[] | null;
   product_prices?: ApiProductPricePayload[] | null;
   modifications?: ApiProductModificationPayload[] | null;
+  bundle_items?: ApiProductBundleItemPayload[] | null;
+  bundle_available_stock?: number | string | null;
   created_at?: string | null;
   updated_at?: string | null;
 }
@@ -1981,12 +2035,41 @@ function normaliseProduct(product: ApiProductPayload): Product {
     ? product.product_prices.map(normaliseProductPrice)
     : undefined;
 
+  const productType: ProductType = product.type === 'bundle' ? 'bundle' : 'single';
+  const bundlePricingMode: BundlePricingMode = product.bundle_pricing_mode === 'sum_components'
+    ? 'sum_components'
+    : 'fixed';
+
+  const bundleItems = Array.isArray(product.bundle_items)
+    ? product.bundle_items.map((item) => ({
+      id: String(item.id ?? ''),
+      bundleProductId: String(item.bundle_product_id ?? ''),
+      componentProductId: String(item.component_product_id ?? ''),
+      quantity: toNumber(item.quantity, 1),
+      sortOrder: toNumber(item.sort_order ?? 0, 0),
+      componentProduct: item.component_product
+        ? {
+          id: String(item.component_product.id ?? ''),
+          name: String(item.component_product.name ?? ''),
+          sku: item.component_product.sku ?? null,
+          price: toNumber(item.component_product.price ?? null, 0),
+          stock: toNumber(item.component_product.stock ?? null, 0),
+          isActive: typeof item.component_product.is_active === 'boolean'
+            ? item.component_product.is_active
+            : true,
+        }
+        : null,
+    }))
+    : undefined;
+
   return {
     id: String(product.id ?? ''),
     name: String(product.name ?? ''),
     slug: String(product.slug ?? ''),
     description: product.description ?? null,
     category: product.category ?? categoryDetail?.name ?? null,
+    type: productType,
+    bundlePricingMode,
     price: toNumber(product.price, 0),
     image: product.image ?? null,
     imageUrl: typeof product.image_url === 'string' ? product.image_url : null,
@@ -2007,6 +2090,10 @@ function normaliseProduct(product: ApiProductPayload): Product {
     variantCombinations,
     productPrices,
     modifications,
+    bundleItems,
+    bundleAvailableStock: product.bundle_available_stock != null
+      ? toNumber(product.bundle_available_stock, 0)
+      : null,
     createdAt: product.created_at ?? undefined,
     updatedAt: product.updated_at ?? undefined,
   };
@@ -2126,6 +2213,8 @@ function buildProductJsonPayload(input: ProductInput) {
   const payload: Record<string, unknown> = {
     name: input.name,
     description: input.description ?? null,
+    type: input.type ?? 'single',
+    bundle_pricing_mode: input.type === 'bundle' ? (input.bundle_pricing_mode ?? 'fixed') : 'fixed',
     price: input.price,
     sku: input.sku,
     barcode: input.barcode ?? null,
@@ -2189,6 +2278,14 @@ function buildProductJsonPayload(input: ProductInput) {
     }));
   }
 
+  if (input.bundle_items !== undefined) {
+    payload.bundle_items = input.bundle_items.map((item) => ({
+      component_product_id: item.component_product_id,
+      quantity: item.quantity,
+      sort_order: item.sort_order ?? 0,
+    }));
+  }
+
   return payload;
 }
 
@@ -2197,6 +2294,8 @@ function buildProductFormData(input: ProductInput): FormData {
 
   formData.append('name', input.name);
   formData.append('description', input.description ?? '');
+  formData.append('type', input.type ?? 'single');
+  formData.append('bundle_pricing_mode', input.type === 'bundle' ? (input.bundle_pricing_mode ?? 'fixed') : 'fixed');
   formData.append('price', String(input.price));
   formData.append('sku', input.sku);
   if (input.barcode !== undefined && input.barcode !== null) {
@@ -2273,6 +2372,15 @@ function buildProductFormData(input: ProductInput): FormData {
       is_active: modification.isActive ?? true,
     }));
     formData.append('modifications', JSON.stringify(modificationsPayload));
+  }
+
+  if (input.bundle_items !== undefined) {
+    const bundleItemsPayload = input.bundle_items.map((item) => ({
+      component_product_id: item.component_product_id,
+      quantity: item.quantity,
+      sort_order: item.sort_order ?? 0,
+    }));
+    formData.append('bundle_items', JSON.stringify(bundleItemsPayload));
   }
 
   if (input.stores !== undefined) {

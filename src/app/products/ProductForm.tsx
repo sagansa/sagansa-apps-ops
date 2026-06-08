@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
+  BundlePricingMode,
   Product,
   ProductInput,
+  ProductType,
   ProductVariantInput,
   ProductVariantGroup,
   ProductVariantGroupInput,
@@ -38,6 +40,11 @@ type StoreSelectionState = {
   price: string;
 };
 
+type BundleItemFormState = {
+  componentProductId: string;
+  quantity: string;
+};
+
 type CombinationFormState = {
   variantIds: string[];
   name: string;
@@ -54,6 +61,7 @@ interface ProductFormProps {
   error: string | null;
   onClose: () => void;
   onSubmit: (payload: ProductInput) => Promise<void>;
+  products: Product[];
   stores: { id: string; name: string; nickname?: string | null }[];
   storesLoading: boolean;
 }
@@ -100,12 +108,16 @@ const ProductForm = ({
   error,
   onClose,
   onSubmit,
+  products = [],
   stores = [],
   storesLoading = false,
 }: ProductFormProps) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
+  const [productType, setProductType] = useState<ProductType>('single');
+  const [bundlePricingMode, setBundlePricingMode] = useState<BundlePricingMode>('fixed');
+  const [bundleItems, setBundleItems] = useState<BundleItemFormState[]>([]);
   const [sku, setSku] = useState('');
   const [barcode, setBarcode] = useState('');
   const [stock, setStock] = useState('');
@@ -126,6 +138,25 @@ const ProductForm = ({
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [editingGroupIndex, setEditingGroupIndex] = useState<number | null>(null);
   const allStoresSelected = stores.length > 0 && stores.every((store) => storeSelections[store.id]?.selected);
+  const bundleComponentOptions = useMemo(
+    () => products
+      .filter((candidate) => candidate.id !== product?.id && candidate.type !== 'bundle')
+      .sort((a, b) => a.name.localeCompare(b.name, 'id', { sensitivity: 'base' })),
+    [product?.id, products],
+  );
+  const bundleComponentTotal = useMemo(
+    () => bundleItems.reduce((total, item) => {
+      const component = bundleComponentOptions.find((candidate) => candidate.id === item.componentProductId);
+      const quantity = item.quantity !== '' ? Number(item.quantity) : 0;
+
+      if (!component || !Number.isFinite(quantity) || quantity <= 0) {
+        return total;
+      }
+
+      return total + (component.price * quantity);
+    }, 0),
+    [bundleComponentOptions, bundleItems],
+  );
 
   // ...
 
@@ -150,6 +181,12 @@ const ProductForm = ({
       setName(product.name);
       setDescription(product.description || '');
       setPrice(product.price.toString());
+      setProductType(product.type ?? 'single');
+      setBundlePricingMode(product.bundlePricingMode ?? 'fixed');
+      setBundleItems(product.bundleItems?.map((item) => ({
+        componentProductId: item.componentProductId,
+        quantity: item.quantity.toString(),
+      })) ?? []);
       setSku(product.sku);
       setBarcode(product.barcode || '');
       setStock(product.stock.toString());
@@ -196,6 +233,9 @@ const ProductForm = ({
       setName('');
       setDescription('');
       setPrice('');
+      setProductType('single');
+      setBundlePricingMode('fixed');
+      setBundleItems([]);
       setSku('');
       setBarcode('');
       setStock('');
@@ -385,6 +425,20 @@ const ProductForm = ({
     );
   };
 
+  const handleBundleItemChange = (
+    index: number,
+    key: keyof BundleItemFormState,
+    value: string,
+  ) => {
+    setBundleItems((prev) =>
+      prev.map((item, idx) =>
+        idx === index
+          ? { ...item, [key]: value }
+          : item,
+      ),
+    );
+  };
+
   const handleCombinationChange = (
     index: number,
     key: keyof CombinationFormState,
@@ -454,7 +508,9 @@ const ProductForm = ({
     // SKU is optional now (auto-generated)
     // Image is optional now (initials fallback)
 
-    const priceValue = price !== '' ? Number(price) : 0;
+    const priceValue = productType === 'bundle' && bundlePricingMode === 'sum_components'
+      ? bundleComponentTotal
+      : (price !== '' ? Number(price) : 0);
     if (!Number.isFinite(priceValue) || priceValue < 0) {
       setLocalError('Price must be a valid non-negative number.');
       return;
@@ -466,9 +522,37 @@ const ProductForm = ({
       return;
     }
 
+    const bundlePayload = bundleItems
+      .map((item, index) => ({
+        component_product_id: item.componentProductId,
+        quantity: item.quantity !== '' ? Number(item.quantity) : 0,
+        sort_order: index,
+      }))
+      .filter((item) => item.component_product_id !== '');
+
+    if (productType === 'bundle') {
+      if (bundlePayload.length === 0) {
+        setLocalError('Bundle products must have at least one component.');
+        return;
+      }
+
+      if (bundlePayload.some((item) => !Number.isInteger(item.quantity) || item.quantity < 1)) {
+        setLocalError('Bundle component quantity must be at least 1.');
+        return;
+      }
+
+      const uniqueComponentIds = new Set(bundlePayload.map((item) => item.component_product_id));
+      if (uniqueComponentIds.size !== bundlePayload.length) {
+        setLocalError('Bundle components cannot be duplicated.');
+        return;
+      }
+    }
+
     const payload: ProductInput = {
       name: name.trim(),
       description: description.trim() || null,
+      type: productType,
+      bundle_pricing_mode: productType === 'bundle' ? bundlePricingMode : 'fixed',
       price: priceValue,
       sku: sku.trim(),
       barcode: barcode.trim() || null,
@@ -489,6 +573,7 @@ const ProductForm = ({
         isActive: c.isActive
       })),
       modifications: modifications.map(toModificationInput),
+      bundle_items: productType === 'bundle' ? bundlePayload : [],
     };
 
     const selectedStores = Object.entries(storeSelections)
@@ -561,6 +646,30 @@ const ProductForm = ({
                 <FormField label="Product Name" required>
                   <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter product name" />
                 </FormField>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <FormField label="Product Type">
+                    <select
+                      value={productType}
+                      onChange={(e) => setProductType(e.target.value as ProductType)}
+                      className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="single">Single Product</option>
+                      <option value="bundle">Bundle / Paket</option>
+                    </select>
+                  </FormField>
+                  {productType === 'bundle' ? (
+                    <FormField label="Bundle Price">
+                      <select
+                        value={bundlePricingMode}
+                        onChange={(e) => setBundlePricingMode(e.target.value as BundlePricingMode)}
+                        className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="fixed">Manual Price</option>
+                        <option value="sum_components">Sum Components</option>
+                      </select>
+                    </FormField>
+                  ) : null}
+                </div>
                 <FormField label="SKU">
                   <Input
                     value={sku}
@@ -573,7 +682,15 @@ const ProductForm = ({
                 </FormField>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <FormField label="Price (Rp)" required>
-                    <Input type="number" min="0" step="100" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0" />
+                    <Input
+                      type="number"
+                      min="0"
+                      step="100"
+                      value={productType === 'bundle' && bundlePricingMode === 'sum_components' ? String(bundleComponentTotal) : price}
+                      onChange={(e) => setPrice(e.target.value)}
+                      disabled={productType === 'bundle' && bundlePricingMode === 'sum_components'}
+                      placeholder="0"
+                    />
                   </FormField>
                   <FormField label="Barcode">
                     <Input value={barcode} onChange={(e) => setBarcode(e.target.value)} placeholder="Optional barcode" />
@@ -597,6 +714,79 @@ const ProductForm = ({
                     ))}
                   </select>
                 </FormField>
+
+                {productType === 'bundle' ? (
+                  <section className="space-y-3 rounded-xl border border-gray-200 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-sm font-semibold text-gray-900">Bundle Components</h3>
+                        <p className="text-xs text-gray-600">
+                          Est. price Rp {bundleComponentTotal.toLocaleString('id-ID')}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setBundleItems((prev) => [...prev, { componentProductId: '', quantity: '1' }])}
+                        disabled={bundleComponentOptions.length === 0}
+                      >
+                        Add Component
+                      </Button>
+                    </div>
+                    {bundleItems.length === 0 ? (
+                      <p className="text-sm text-gray-600">No components selected.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {bundleItems.map((item, index) => {
+                          const selectedIds = new Set(
+                            bundleItems
+                              .filter((_, idx) => idx !== index)
+                              .map((entry) => entry.componentProductId),
+                          );
+
+                          return (
+                            <div key={`bundle-item-${index}`} className="grid items-center gap-2 rounded-md border border-gray-200 bg-white p-2 sm:grid-cols-[minmax(0,1fr)_96px_80px]">
+                              <select
+                                value={item.componentProductId}
+                                onChange={(e) => handleBundleItemChange(index, 'componentProductId', e.target.value)}
+                                className="h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              >
+                                <option value="">Select component</option>
+                                {bundleComponentOptions.map((component) => (
+                                  <option
+                                    key={component.id}
+                                    value={component.id}
+                                    disabled={selectedIds.has(component.id)}
+                                  >
+                                    {component.name} - Rp {component.price.toLocaleString('id-ID')} - stock {component.stock}
+                                  </option>
+                                ))}
+                              </select>
+                              <Input
+                                type="number"
+                                min="1"
+                                value={item.quantity}
+                                onChange={(e) => handleBundleItemChange(index, 'quantity', e.target.value)}
+                                placeholder="Qty"
+                                className="h-9"
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-9 text-red-500 hover:text-red-600"
+                                onClick={() => setBundleItems((prev) => prev.filter((_, idx) => idx !== index))}
+                              >
+                                Remove
+                              </Button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </section>
+                ) : null}
 
               </div>
               <div className="space-y-4">
@@ -646,7 +836,7 @@ const ProductForm = ({
                     <FilePondUploader
                       files={filePondFiles}
                       onUpdateFiles={(fileItems) => {
-                        setFilePondFiles(fileItems.map((fileItem) => fileItem.file));
+                        setFilePondFiles(fileItems.map((fileItem) => fileItem.file as File));
                         if (fileItems.length > 0) {
                           const file = fileItems[0].file;
                           if (file instanceof File) {

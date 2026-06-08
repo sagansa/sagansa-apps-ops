@@ -18,6 +18,7 @@ type LoadingState = 'idle' | 'initial' | 'refresh';
 type StoreOption = {
   id: string;
   name: string;
+  nickname?: string | null;
 };
 
 export default function ProductsClient() {
@@ -167,7 +168,10 @@ export default function ProductsClient() {
       );
     }
 
-    return result;
+    return [...result].sort((a, b) =>
+      a.name.localeCompare(b.name, 'id', { sensitivity: 'base' }) ||
+      a.id.localeCompare(b.id)
+    );
   }, [products, selectedStoreFilter, selectedCategoryFilter]);
 
   const handleCreate = () => {
@@ -376,9 +380,19 @@ export default function ProductsClient() {
                           )}
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-gray-900">{product.name}</p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-sm font-semibold text-gray-900">{product.name}</p>
+                            {product.type === 'bundle' ? (
+                              <Badge variant="secondary">Paket</Badge>
+                            ) : null}
+                          </div>
                           {product.category ? (
                             <p className="text-xs text-gray-600">{product.category}</p>
+                          ) : null}
+                          {product.type === 'bundle' ? (
+                            <p className="text-xs text-gray-600">
+                              {product.bundleItems?.length ?? 0} components
+                            </p>
                           ) : null}
                         </div>
                       </div>
@@ -388,9 +402,13 @@ export default function ProductsClient() {
                       Rp {product.price.toLocaleString('id-ID')}
                     </td>
                     <td className="px-4 py-4 text-sm text-gray-800">
-                      {product.stock.toLocaleString('id-ID')}
+                      {product.type === 'bundle'
+                        ? (product.bundleAvailableStock ?? 0).toLocaleString('id-ID')
+                        : product.stock.toLocaleString('id-ID')}
                       <span className="ml-2 text-xs text-gray-600">
-                        (Remaining: {product.remaining ? 'Yes' : 'No'})
+                        {product.type === 'bundle'
+                          ? '(from components)'
+                          : `(Remaining: ${product.remaining ? 'Yes' : 'No'})`}
                       </span>
                     </td>
                     <td className="px-4 py-4 text-sm text-gray-800">
@@ -403,7 +421,7 @@ export default function ProductsClient() {
                       {product.modifications?.length ?? 0}
                     </td>
                     <td className="px-4 py-4 text-sm">
-                      <Badge variant={product.isActive ? '' : 'destructive'}>
+                      <Badge variant={product.isActive ? 'default' : 'destructive'}>
                         {product.isActive ? 'Active' : 'Inactive'}
                       </Badge>
                     </td>
@@ -456,6 +474,7 @@ export default function ProductsClient() {
         error={formError}
         onClose={handleCloseForm}
         onSubmit={handleSubmit}
+        products={products}
         stores={stores}
         storesLoading={storesLoading}
       />

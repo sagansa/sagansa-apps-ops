@@ -11,6 +11,28 @@ import TaxSettingsForm from '@/components/stores/TaxSettingsForm';
 import { Button } from '@/components/ui';
 import { ArrowLeft, Plus } from 'lucide-react';
 
+const normaliseStorePaymentMethods = (methods: PaymentMethod[], storeId: string) => {
+    const seen = new Set<string>();
+    const selectedStoreId = String(storeId);
+
+    return methods
+        .filter((method) => String(method.store_id) === selectedStoreId)
+        .filter((method) => {
+            const key = [
+                method.is_default ? 'default' : 'custom',
+                method.type,
+                String(method.name).trim().toLowerCase(),
+            ].join(':');
+
+            if (seen.has(key)) {
+                return false;
+            }
+
+            seen.add(key);
+            return true;
+        });
+};
+
 function PaymentMethodsContent() {
     const params = useParams();
     const router = useRouter();
@@ -37,7 +59,7 @@ function PaymentMethodsContent() {
                 setStore(storeData as any);
             }
 
-            setPaymentMethods(methodsData as PaymentMethod[]);
+            setPaymentMethods(normaliseStorePaymentMethods(methodsData as PaymentMethod[], storeId));
         } catch (error) {
             console.error('Error fetching data:', error);
         } finally {
@@ -87,7 +109,7 @@ function PaymentMethodsContent() {
 
             // Refresh list
             const methods = await apiService.getPaymentMethods(storeId);
-            setPaymentMethods(methods as PaymentMethod[]);
+            setPaymentMethods(normaliseStorePaymentMethods(methods as PaymentMethod[], storeId));
         } catch (error) {
             console.error('Error saving payment method:', error);
             throw error;
@@ -108,7 +130,7 @@ function PaymentMethodsContent() {
             await apiService.deletePaymentMethod(id);
             // Refresh list
             const methods = await apiService.getPaymentMethods(storeId);
-            setPaymentMethods(methods as PaymentMethod[]);
+            setPaymentMethods(normaliseStorePaymentMethods(methods as PaymentMethod[], storeId));
         } catch (error: any) {
             console.error('Error deleting payment method:', error);
             const errorMessage = error?.message || 'Gagal menghapus metode pembayaran. Silakan coba lagi.';
@@ -121,7 +143,7 @@ function PaymentMethodsContent() {
             await apiService.updatePaymentMethod(method.id, { is_active: !method.is_active });
             // Refresh list
             const methods = await apiService.getPaymentMethods(storeId);
-            setPaymentMethods(methods as PaymentMethod[]);
+            setPaymentMethods(normaliseStorePaymentMethods(methods as PaymentMethod[], storeId));
         } catch (error) {
             console.error('Error toggling status:', error);
         }
