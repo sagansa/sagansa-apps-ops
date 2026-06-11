@@ -362,6 +362,43 @@ class ApiService {
     });
   }
 
+  // Image Upload
+  /**
+   * Upload an image to the img service via signed URL.
+   * Returns the path (e.g. "UUID.webp") on success.
+   */
+  async uploadImage(file: File): Promise<string> {
+    // 1. Get signed upload URL from api-ops
+    const signedUrlResponse = await this.request('/auth/upload-url');
+    if (!isRecord(signedUrlResponse) || typeof (signedUrlResponse as any).upload_url !== 'string') {
+      throw new ApiError('Failed to obtain upload URL.', 500);
+    }
+
+    const uploadUrl = (signedUrlResponse as any).upload_url as string;
+
+    // 2. POST the file directly to the img service
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const uploadResponse = await fetch(uploadUrl, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!uploadResponse.ok) {
+      let message = `Upload failed with status ${uploadResponse.status}`;
+      try {
+        const body = await uploadResponse.json();
+        if (typeof body.error === 'string') message = body.error;
+      } catch { /* ignore */ }
+      throw new ApiError(message, uploadResponse.status);
+    }
+
+    const result = await uploadResponse.json();
+    // Return the path (e.g. "UUID.webp") — this is what the backend stores
+    return (result.path as string) ?? (result.url as string);
+  }
+
   // Store endpoints
   async getTenantStores(tenantId: string) {
     const response = await this.request(`/tenants/${tenantId}/stores`);
@@ -416,10 +453,17 @@ class ApiService {
   }
 
   async createProduct(input: ProductInput) {
-    const formData = buildProductFormData(input);
+    const payload = buildProductJsonPayload(input);
+
+    // Upload image first if present
+    if (input.imageFile instanceof File) {
+      const imagePath = await this.uploadImage(input.imageFile);
+      payload.image = imagePath;
+    }
+
     const response = await this.request('/products', {
       method: 'POST',
-      body: formData,
+      body: JSON.stringify(payload),
     });
 
     if (isRecord(response) && 'product' in response && response.product) {
@@ -430,22 +474,14 @@ class ApiService {
   }
 
   async updateProduct(productId: string, input: ProductInput) {
+    const payload = buildProductJsonPayload(input);
+
+    // Upload image first if present
     if (input.imageFile instanceof File) {
-      const formData = buildProductFormData(input);
-      formData.append('_method', 'PUT');
-      const response = await this.request(`/products/${productId}`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (isRecord(response) && 'product' in response && response.product) {
-        (response as Record<string, unknown>).product = normaliseProduct(response.product as ApiProductPayload);
-      }
-
-      return response;
+      const imagePath = await this.uploadImage(input.imageFile);
+      payload.image = imagePath;
     }
 
-    const payload = buildProductJsonPayload(input);
     const response = await this.request(`/products/${productId}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
@@ -489,9 +525,18 @@ class ApiService {
   }
 
   async createStore(tenantId: string, storeData: StoreInput) {
+    const payload: Record<string, unknown> = { ...storeData };
+
+    if (storeData.email_receipt_logo instanceof File) {
+      payload.email_receipt_logo = await this.uploadImage(storeData.email_receipt_logo);
+    }
+    if (storeData.print_receipt_logo instanceof File) {
+      payload.print_receipt_logo = await this.uploadImage(storeData.print_receipt_logo);
+    }
+
     const response = await this.request(`/tenants/${tenantId}/stores`, {
       method: 'POST',
-      body: JSON.stringify(storeData),
+      body: JSON.stringify(payload),
     });
     if (isRecord(response) && response.success && 'store' in response && response.store) {
       response.store = normaliseStore(response.store as ApiStorePayload);
@@ -500,9 +545,18 @@ class ApiService {
   }
 
   async updateStore(tenantId: string, storeId: string, storeData: StoreInput) {
+    const payload: Record<string, unknown> = { ...storeData };
+
+    if (storeData.email_receipt_logo instanceof File) {
+      payload.email_receipt_logo = await this.uploadImage(storeData.email_receipt_logo);
+    }
+    if (storeData.print_receipt_logo instanceof File) {
+      payload.print_receipt_logo = await this.uploadImage(storeData.print_receipt_logo);
+    }
+
     const response = await this.request(`/tenants/${tenantId}/stores/${storeId}`, {
       method: 'PUT',
-      body: JSON.stringify(storeData),
+      body: JSON.stringify(payload),
     });
     if (isRecord(response) && response.success && 'store' in response && response.store) {
       response.store = normaliseStore(response.store as ApiStorePayload);
@@ -758,19 +812,20 @@ class ApiService {
     gps_accuracy?: number;
     device_info?: string;
   }) {
-    const formData = new FormData();
-    formData.append('store_id', data.store_id);
-    formData.append('shift_store_id', data.shift_store_id);
-    formData.append('selfie_photo', data.selfie_photo); // This will be stored in image_in field
-    formData.append('latitude', data.latitude.toString());
-    formData.append('longitude', data.longitude.toString());
-
-    if (data.gps_accuracy) formData.append('gps_accuracy', data.gps_accuracy.toString());
-    if (data.device_info) formData.append('device_info', data.device_info);
+    // Upload selfie first, then send JSON with URL
+    const selfiePath = await this.uploadImage(data.selfie_photo);
 
     const response = await this.request('/presence/check-in', {
       method: 'POST',
-      body: formData,
+      body: JSON.stringify({
+        store_id: data.store_id,
+        shift_store_id: data.shift_store_id,
+        selfie_photo: selfiePath,
+        latitude: data.latitude,
+        longitude: data.longitude,
+        gps_accuracy: data.gps_accuracy,
+        device_info: data.device_info,
+      }),
     });
 
     if (isRecord(response) && response.data && response.data.attendance) {
@@ -794,19 +849,20 @@ class ApiService {
     gps_accuracy?: number;
     device_info?: string;
   }) {
-    const formData = new FormData();
-    formData.append('attendance_id', data.attendance_id);
-    formData.append('store_id', data.store_id);
-    formData.append('selfie_photo', data.selfie_photo); // This will be stored in image_out field
-    formData.append('latitude', data.latitude.toString());
-    formData.append('longitude', data.longitude.toString());
-
-    if (data.gps_accuracy) formData.append('gps_accuracy', data.gps_accuracy.toString());
-    if (data.device_info) formData.append('device_info', data.device_info);
+    // Upload selfie first, then send JSON with URL
+    const selfiePath = await this.uploadImage(data.selfie_photo);
 
     const response = await this.request('/presence/check-out', {
       method: 'POST',
-      body: formData,
+      body: JSON.stringify({
+        attendance_id: data.attendance_id,
+        store_id: data.store_id,
+        selfie_photo: selfiePath,
+        latitude: data.latitude,
+        longitude: data.longitude,
+        gps_accuracy: data.gps_accuracy,
+        device_info: data.device_info,
+      }),
     });
 
     if (isRecord(response) && response.data && response.data.attendance) {
@@ -877,36 +933,25 @@ class ApiService {
   }
 
   async createPaymentMethod(data: any) {
-    // Check if there's a file to upload (QRIS image)
-    if (data.details?.qr_image_file) {
-      const formData = new FormData();
-      formData.append('store_id', data.store_id);
-      formData.append('type', data.type);
-      formData.append('name', data.name);
-      formData.append('is_active', data.is_active ? '1' : '0');
-      formData.append('require_proof', data.require_proof ? '1' : '0');
+    const payload = { ...data };
 
-      appendPaymentMethodDetails(formData, data.details);
-
-      if (!data.details.qris_payload) {
-        formData.append('qr_image', data.details.qr_image_file);
-      }
-
-      const response = await this.request('/payment-methods', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (isRecord(response) && (response as any).data) {
-        return (response as any).data;
-      }
-      return response;
+    // Upload QRIS image file if present
+    if (payload.details?.qr_image_file instanceof File) {
+      const imagePath = await this.uploadImage(payload.details.qr_image_file);
+      payload.details = { ...payload.details, qr_image: imagePath };
+      delete payload.details.qr_image_file;
     }
 
-    // Regular JSON submission for non-file data
+    // Upload generic payment image file if present
+    if (payload.details?.payment_image_file instanceof File) {
+      const imagePath = await this.uploadImage(payload.details.payment_image_file);
+      payload.details = { ...payload.details, image: imagePath };
+      delete payload.details.payment_image_file;
+    }
+
     const response = await this.request('/payment-methods', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     });
     if (isRecord(response) && (response as any).data) {
       return (response as any).data;
@@ -915,39 +960,25 @@ class ApiService {
   }
 
   async updatePaymentMethod(id: string, data: any) {
-    // Check if there's a file to upload (QRIS image)
-    if (data.details?.qr_image_file) {
-      const formData = new FormData();
+    const payload = { ...data };
 
-      // Add regular fields if present
-      if (data.store_id) formData.append('store_id', data.store_id);
-      if (data.type) formData.append('type', data.type);
-      if (data.name) formData.append('name', data.name);
-      if (data.is_active !== undefined) formData.append('is_active', data.is_active ? '1' : '0');
-      if (data.require_proof !== undefined) formData.append('require_proof', data.require_proof ? '1' : '0');
-
-      appendPaymentMethodDetails(formData, data.details);
-
-      if (!data.details.qris_payload) {
-        formData.append('qr_image', data.details.qr_image_file);
-      }
-      formData.append('_method', 'PUT');
-
-      const response = await this.request(`/payment-methods/${id}`, {
-        method: 'POST', // Laravel uses POST with _method for file uploads
-        body: formData,
-      });
-
-      if (isRecord(response) && (response as any).data) {
-        return (response as any).data;
-      }
-      return response;
+    // Upload QRIS image file if present
+    if (payload.details?.qr_image_file instanceof File) {
+      const imagePath = await this.uploadImage(payload.details.qr_image_file);
+      payload.details = { ...payload.details, qr_image: imagePath };
+      delete payload.details.qr_image_file;
     }
 
-    // Regular JSON submission for non-file data
+    // Upload generic payment image file if present
+    if (payload.details?.payment_image_file instanceof File) {
+      const imagePath = await this.uploadImage(payload.details.payment_image_file);
+      payload.details = { ...payload.details, image: imagePath };
+      delete payload.details.payment_image_file;
+    }
+
     const response = await this.request(`/payment-methods/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     });
     if (isRecord(response) && (response as any).data) {
       return (response as any).data;
@@ -1449,8 +1480,8 @@ export interface StoreInput {
   longitude?: number | null;
   receipt_header?: string | null;
   receipt_footer?: string | null;
-  email_receipt_logo?: File | null;
-  print_receipt_logo?: File | null;
+  email_receipt_logo?: File | string | null;
+  print_receipt_logo?: File | string | null;
   address?: string | null;
   phone?: string | null;
 }
@@ -1604,25 +1635,6 @@ export interface AttendanceCreateInput {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
-}
-
-function appendPaymentMethodDetails(formData: FormData, details: unknown) {
-  if (!isRecord(details)) {
-    return;
-  }
-
-  for (const [key, value] of Object.entries(details)) {
-    if (key === 'qr_image_file' || key === 'payment_image' || value === undefined || value === null) {
-      continue;
-    }
-
-    if (typeof value === 'object') {
-      formData.append(`details[${key}]`, JSON.stringify(value));
-      continue;
-    }
-
-    formData.append(`details[${key}]`, String(value));
-  }
 }
 
 function extractErrorMessage(body: unknown): string | null {
@@ -2287,117 +2299,6 @@ function buildProductJsonPayload(input: ProductInput) {
   }
 
   return payload;
-}
-
-function buildProductFormData(input: ProductInput): FormData {
-  const formData = new FormData();
-
-  formData.append('name', input.name);
-  formData.append('description', input.description ?? '');
-  formData.append('type', input.type ?? 'single');
-  formData.append('bundle_pricing_mode', input.type === 'bundle' ? (input.bundle_pricing_mode ?? 'fixed') : 'fixed');
-  formData.append('price', String(input.price));
-  formData.append('sku', input.sku);
-  if (input.barcode !== undefined && input.barcode !== null) {
-    formData.append('barcode', input.barcode);
-  }
-
-  if (input.unit_id) {
-    formData.append('unit_id', input.unit_id);
-  }
-  if (input.category_id) {
-    formData.append('category_id', input.category_id);
-  }
-  if (input.tenant_id) {
-    formData.append('tenant_id', input.tenant_id);
-  }
-  if (input.user_id) {
-    formData.append('user_id', input.user_id);
-  }
-
-  const stock = input.stock ?? 0;
-  const request = input.request ?? false;
-  const remaining = input.remaining !== undefined ? Boolean(input.remaining) : true;
-
-  formData.append('stock', String(stock));
-  formData.append('request', request ? '1' : '0');
-  formData.append('remaining', remaining ? '1' : '0');
-
-  if (typeof input.is_active === 'boolean') {
-    formData.append('is_active', input.is_active ? '1' : '0');
-  }
-
-  if (input.imageFile instanceof File) {
-    formData.append('image', input.imageFile);
-  }
-  if (input.remove_image) {
-    formData.append('remove_image', '1');
-  }
-
-  if (input.variants !== undefined) {
-    const variantsPayload = input.variants.map((variant) => ({
-      name: variant.name,
-      sku: variant.sku ?? null,
-      price: variant.price ?? 0,
-      stock: variant.stock ?? 0,
-      is_active: variant.isActive ?? true,
-    }));
-    formData.append('variants', JSON.stringify(variantsPayload));
-  } else if (input.variant_groups !== undefined) {
-    // When using variant_groups, send empty array for legacy variants field
-    formData.append('variants', JSON.stringify([]));
-  }
-
-  if (input.variant_groups !== undefined) {
-    const variantGroupsPayload = input.variant_groups.map((group) => ({
-      id: group.id,
-      name: group.name,
-      is_required: group.isRequired,
-      variants: group.variants.map((variant) => ({
-        name: variant.name,
-        sku: variant.sku ?? null,
-        price: variant.price ?? 0,
-        stock: variant.stock ?? 0,
-        is_active: variant.isActive ?? true,
-        available_with_variants: variant.availableWithVariants ?? null,
-      })),
-    }));
-    formData.append('variant_groups', JSON.stringify(variantGroupsPayload));
-  }
-
-  if (input.modifications !== undefined) {
-    const modificationsPayload = input.modifications.map((modification) => ({
-      name: modification.name,
-      price: modification.price ?? 0,
-      is_active: modification.isActive ?? true,
-    }));
-    formData.append('modifications', JSON.stringify(modificationsPayload));
-  }
-
-  if (input.bundle_items !== undefined) {
-    const bundleItemsPayload = input.bundle_items.map((item) => ({
-      component_product_id: item.component_product_id,
-      quantity: item.quantity,
-      sort_order: item.sort_order ?? 0,
-    }));
-    formData.append('bundle_items', JSON.stringify(bundleItemsPayload));
-  }
-
-  if (input.stores !== undefined) {
-    const storesPayload = input.stores.map((store) => ({
-      id: store.id,
-      price: store.price != null ? Math.round(store.price) : null,
-    }));
-    formData.append('stores', JSON.stringify(storesPayload));
-  }
-
-  if (input.store_ids !== undefined) {
-    input.store_ids.forEach((storeId) => {
-      formData.append('store_ids[]', storeId);
-    });
-  }
-
-  return formData;
 }
 
 function normaliseUser(user: ApiUserPayload): User {
