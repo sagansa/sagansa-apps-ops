@@ -20,7 +20,7 @@ import { Textarea } from '@/components/ui/Textarea';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { VariantGroupModal } from './VariantGroupModal';
 import { FormField } from '@/components/ui/FormField';
-import { FilePondUploader } from '@/components/ui/FilePondUploader';
+import { ImageUploader } from '@/components/ui/ImageUploader';
 import { compressImageFile } from '@/app/utils/imageCompression';
 
 type VariantGroupFormState = {
@@ -128,7 +128,6 @@ const ProductForm = ({
   const [remaining, setRemaining] = useState(true);
   const [isActive, setIsActive] = useState(true);
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [filePondFiles, setFilePondFiles] = useState<File[]>([]);
   const [removeImage, setRemoveImage] = useState(false);
   const [variantGroups, setVariantGroups] = useState<VariantGroupFormState[]>([]);
   const [storeSelections, setStoreSelections] = useState<Record<string, StoreSelectionState>>({});
@@ -170,7 +169,6 @@ const ProductForm = ({
     if (!isOpen) {
       setLocalError(null);
       setImageFile(null);
-      setFilePondFiles([]);
       setRemoveImage(false);
       setStoreSelections({});
       setStoreSelectionsInitialized(false);
@@ -196,36 +194,7 @@ const ProductForm = ({
       setRemaining(product.remaining);
       setIsActive(product.isActive);
       setRemoveImage(false);
-
-      if (product.imageUrl) {
-        // Use proxy to bypass CORS
-        let fetchUrl = product.imageUrl;
-        if (fetchUrl.includes('localhost:8000')) {
-          // Replace origin with proxy path AND strip /storage because rewrite adds it back
-          fetchUrl = fetchUrl.replace(/^https?:\/\/[^/]+\/storage/, '/backend-storage');
-        } else if (fetchUrl.includes('192.168.0.121:8000')) {
-          fetchUrl = fetchUrl.replace(/^https?:\/\/[^/]+\/storage/, '/backend-storage');
-        }
-
-        // Fetch the image to display it in FilePond as a "local" file
-        fetch(fetchUrl)
-          .then(res => {
-            if (!res.ok) throw new Error('Failed to fetch image');
-            return res.blob();
-          })
-          .then(blob => {
-            const file = new File([blob], 'existing-image.jpg', { type: blob.type });
-            setFilePondFiles([file]);
-          })
-          .catch(err => {
-            console.error('Failed to load existing image', err);
-            // Fallback: try to show it anyway (FilePond might fail to preview but at least it's there)
-            // But since storeAsFile=true expects a File, we can't do much else.
-            setFilePondFiles([]);
-          });
-      } else {
-        setFilePondFiles([]);
-      }
+      // Image is displayed directly via imageUrl — no fetch needed
 
       setVariantGroups(product.variantGroups?.map(mapVariantGroupToState) || []);
       setModifications(product.modifications?.map(mapModificationToState) || []);
@@ -244,8 +213,6 @@ const ProductForm = ({
       setRemaining(true);
       setIsActive(true);
       setRemoveImage(false);
-      setFilePondFiles([]);
-      setVariantGroups([]);
       setVariantGroups([]);
       setModifications([]);
       setStoreSelections({});
@@ -834,36 +801,30 @@ const ProductForm = ({
                 </div>
                 <FormField label="Product Image">
                   <div className="mt-1">
-                    <FilePondUploader
-                      files={filePondFiles}
-                      onUpdateFiles={async (fileItems) => {
-                        setFilePondFiles(fileItems.map((fileItem) => fileItem.file as File));
-                        if (fileItems.length > 0) {
-                          const file = fileItems[0].file;
-                          if (file instanceof File) {
-                            try {
-                              const compressedFile = await compressImageFile(file);
-                              setImageFile(compressedFile);
-                              setRemoveImage(false);
-                              setLocalError(null);
-                            } catch (error) {
-                              console.error('Failed to compress product image:', error);
-                              setLocalError('Gagal memproses gambar. Coba gunakan file gambar lain.');
-                              setFilePondFiles([]);
-                              setImageFile(null);
-                            }
+                    <ImageUploader
+                      currentImageUrl={product?.imageUrl}
+                      hasExistingImage={!!product?.image}
+                      onFileSelect={async (file) => {
+                        if (file) {
+                          try {
+                            const compressedFile = await compressImageFile(file);
+                            setImageFile(compressedFile);
+                            setRemoveImage(false);
+                            setLocalError(null);
+                          } catch (error) {
+                            console.error('Failed to compress product image:', error);
+                            setLocalError('Gagal memproses gambar. Coba gunakan file gambar lain.');
+                            setImageFile(null);
                           }
                         } else {
-                          setFilePondFiles([]);
                           setImageFile(null);
-                          if (product?.image) {
-                            setRemoveImage(true);
-                          }
                         }
                       }}
-                      allowMultiple={false}
-                      maxFiles={1}
-                      labelIdle='Drag & Drop your image or <span class="filepond--label-action">Browse</span>'
+                      onRemove={() => {
+                        if (product?.image) {
+                          setRemoveImage(true);
+                        }
+                      }}
                     />
                   </div>
                   <p className="mt-1 text-xs text-gray-500">

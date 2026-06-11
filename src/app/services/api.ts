@@ -365,11 +365,12 @@ class ApiService {
   // Image Upload
   /**
    * Upload an image to the img service via signed URL.
-   * Returns the path (e.g. "UUID.webp") on success.
+   * Returns the path (e.g. "ops/product/UUID.webp") on success.
    */
-  async uploadImage(file: File): Promise<string> {
+  async uploadImage(file: File, directory?: string): Promise<string> {
     // 1. Get signed upload URL from api-ops
-    const signedUrlResponse = await this.request('/auth/upload-url');
+    const query = directory ? `?directory=${encodeURIComponent(directory)}` : '';
+    const signedUrlResponse = await this.request(`/auth/upload-url${query}`);
     if (!isRecord(signedUrlResponse) || typeof (signedUrlResponse as any).upload_url !== 'string') {
       throw new ApiError('Failed to obtain upload URL.', 500);
     }
@@ -457,7 +458,7 @@ class ApiService {
 
     // Upload image first if present
     if (input.imageFile instanceof File) {
-      const imagePath = await this.uploadImage(input.imageFile);
+      const imagePath = await this.uploadImage(input.imageFile, 'ops/product');
       payload.image = imagePath;
     }
 
@@ -478,7 +479,7 @@ class ApiService {
 
     // Upload image first if present
     if (input.imageFile instanceof File) {
-      const imagePath = await this.uploadImage(input.imageFile);
+      const imagePath = await this.uploadImage(input.imageFile, 'ops/product');
       payload.image = imagePath;
     }
 
@@ -528,10 +529,10 @@ class ApiService {
     const payload: Record<string, unknown> = { ...storeData };
 
     if (storeData.email_receipt_logo instanceof File) {
-      payload.email_receipt_logo = await this.uploadImage(storeData.email_receipt_logo);
+      payload.email_receipt_logo = await this.uploadImage(storeData.email_receipt_logo, 'ops/store');
     }
     if (storeData.print_receipt_logo instanceof File) {
-      payload.print_receipt_logo = await this.uploadImage(storeData.print_receipt_logo);
+      payload.print_receipt_logo = await this.uploadImage(storeData.print_receipt_logo, 'ops/store');
     }
 
     const response = await this.request(`/tenants/${tenantId}/stores`, {
@@ -548,10 +549,10 @@ class ApiService {
     const payload: Record<string, unknown> = { ...storeData };
 
     if (storeData.email_receipt_logo instanceof File) {
-      payload.email_receipt_logo = await this.uploadImage(storeData.email_receipt_logo);
+      payload.email_receipt_logo = await this.uploadImage(storeData.email_receipt_logo, 'ops/store');
     }
     if (storeData.print_receipt_logo instanceof File) {
-      payload.print_receipt_logo = await this.uploadImage(storeData.print_receipt_logo);
+      payload.print_receipt_logo = await this.uploadImage(storeData.print_receipt_logo, 'ops/store');
     }
 
     const response = await this.request(`/tenants/${tenantId}/stores/${storeId}`, {
@@ -813,7 +814,7 @@ class ApiService {
     device_info?: string;
   }) {
     // Upload selfie first, then send JSON with URL
-    const selfiePath = await this.uploadImage(data.selfie_photo);
+    const selfiePath = await this.uploadImage(data.selfie_photo, 'ops/attendance');
 
     const response = await this.request('/presence/check-in', {
       method: 'POST',
@@ -850,7 +851,7 @@ class ApiService {
     device_info?: string;
   }) {
     // Upload selfie first, then send JSON with URL
-    const selfiePath = await this.uploadImage(data.selfie_photo);
+    const selfiePath = await this.uploadImage(data.selfie_photo, 'ops/attendance');
 
     const response = await this.request('/presence/check-out', {
       method: 'POST',

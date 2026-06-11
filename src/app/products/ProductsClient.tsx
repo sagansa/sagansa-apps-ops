@@ -369,7 +369,7 @@ export default function ProductsClient() {
                           {product.imageUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
-                              src={product.imageUrl.replace('http://192.168.0.121:8000/storage', '/backend-storage')}
+                              src={product.imageUrl}
                               alt={product.name}
                               className="h-full w-full object-cover"
                             />
