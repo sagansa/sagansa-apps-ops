@@ -231,6 +231,13 @@ export default function ProductsClient() {
   };
 
   const isRefreshing = loadingState === 'refresh';
+  const hasSelectedStore = selectedStoreFilter !== 'all';
+
+  const getSelectedStoreProduct = (product: Product) =>
+    product.stores?.find((store) => store.id === selectedStoreFilter);
+
+  const formatRupiah = (value?: number | null) =>
+    value != null ? `Rp ${value.toLocaleString('id-ID')}` : '-';
 
   return (
     <div className="space-y-6">
@@ -238,7 +245,7 @@ export default function ProductsClient() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Products</h1>
           <p className="mt-1 text-sm text-gray-700">
-            Manage product catalogue, including variants and modifications.
+            Manage product catalogue by store.
           </p>
         </div>
         <Button type="button" onClick={handleCreate} aria-label="Add Product" title="Add Product" >
@@ -318,24 +325,16 @@ export default function ProductsClient() {
                 <th scope="col" className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">
                   Product
                 </th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">
-                  SKU
-                </th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">
-                  Price
-                </th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">
-                  Stock
-                </th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">
-                  Request
-                </th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">
-                  Variants
-                </th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">
-                  Modifications
-                </th>
+                {hasSelectedStore ? (
+                  <>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">
+                      Price
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">
+                      Stock
+                    </th>
+                  </>
+                ) : null}
                 <th scope="col" className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">
                   Status
                 </th>
@@ -347,13 +346,13 @@ export default function ProductsClient() {
             <tbody className="divide-y divide-gray-200 bg-white">
               {isTableLoading ? (
                 <tr>
-                  <td colSpan={10}>
+                  <td colSpan={hasSelectedStore ? 5 : 3}>
                     <LoadingState message="Loading products..." />
                   </td>
                 </tr>
               ) : filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={10}>
+                  <td colSpan={hasSelectedStore ? 5 : 3}>
                     <EmptyState
                       title={selectedStoreFilter === 'all' ? "No products yet" : "No products in this store"}
                       description={selectedStoreFilter === 'all' ? "Create your first product to get started." : "No products are assigned to this store."}
@@ -361,7 +360,10 @@ export default function ProductsClient() {
                   </td>
                 </tr>
               ) : (
-                filteredProducts.map((product) => (
+                filteredProducts.map((product) => {
+                  const selectedStoreProduct = getSelectedStoreProduct(product);
+
+                  return (
                   <tr key={product.id} className="hover:bg-gray-50">
                     <td className="px-4 py-4">
                       <div className="flex items-center space-x-3">
@@ -397,29 +399,18 @@ export default function ProductsClient() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-800">{product.sku}</td>
-                    <td className="px-4 py-4 text-sm font-semibold text-gray-900">
-                      Rp {product.price.toLocaleString('id-ID')}
-                    </td>
-                    <td className="px-4 py-4 text-sm text-gray-800">
-                      {product.type === 'bundle'
-                        ? (product.bundleAvailableStock ?? 0).toLocaleString('id-ID')
-                        : product.stock.toLocaleString('id-ID')}
-                      <span className="ml-2 text-xs text-gray-600">
-                        {product.type === 'bundle'
-                          ? '(from components)'
-                          : `(Remaining: ${product.remaining ? 'Yes' : 'No'})`}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4 text-sm text-gray-800">
-                      {product.request ? 'Yes' : 'No'}
-                    </td>
-                    <td className="px-4 py-4 text-sm text-gray-800">
-                      {product.variants?.length ?? 0}
-                    </td>
-                    <td className="px-4 py-4 text-sm text-gray-800">
-                      {product.modifications?.length ?? 0}
-                    </td>
+                    {hasSelectedStore ? (
+                      <>
+                        <td className="px-4 py-4 text-sm font-semibold text-gray-900">
+                          {formatRupiah(selectedStoreProduct?.price)}
+                        </td>
+                        <td className="px-4 py-4 text-sm text-gray-800">
+                          {selectedStoreProduct?.stock != null
+                            ? selectedStoreProduct.stock.toLocaleString('id-ID')
+                            : '-'}
+                        </td>
+                      </>
+                    ) : null}
                     <td className="px-4 py-4 text-sm">
                       <Badge variant={product.isActive ? 'default' : 'destructive'}>
                         {product.isActive ? 'Active' : 'Inactive'}
@@ -455,7 +446,8 @@ export default function ProductsClient() {
                       </div>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState, useCallback } from 'react';
+import { ImageCropModal } from './ImageCropModal';
 
 interface ImageUploaderProps {
   /** Existing image URL to display (e.g. from product.imageUrl) */
@@ -11,6 +12,12 @@ interface ImageUploaderProps {
   onRemove?: () => void;
   /** Whether we're in "edit" mode with an existing image */
   hasExistingImage?: boolean;
+  /** Enable crop modal before accepting the file (default: true) */
+  enableCrop?: boolean;
+  /** Maximum output resolution when cropping (default: 1200) */
+  maxResolution?: number;
+  /** Aspect ratio for crop (default: 1 = square) */
+  cropAspectRatio?: number;
   className?: string;
 }
 
@@ -19,18 +26,22 @@ export function ImageUploader({
   onFileSelect,
   onRemove,
   hasExistingImage = false,
+  enableCrop = true,
+  maxResolution = 1200,
+  cropAspectRatio = 1,
   className,
 }: ImageUploaderProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isRemoved, setIsRemoved] = useState(false);
+  // Pending file for crop modal
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   const displayUrl = previewUrl || (!isRemoved ? currentImageUrl : null);
 
-  const handleFile = useCallback(
+  const applyFile = useCallback(
     (file: File) => {
-      if (!file.type.startsWith('image/')) return;
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
       setIsRemoved(false);
@@ -39,24 +50,50 @@ export function ImageUploader({
     [onFileSelect],
   );
 
+  const handleRawFile = useCallback(
+    (file: File) => {
+      if (!file.type.startsWith('image/')) return;
+
+      if (enableCrop) {
+        // Open crop modal — don't apply yet
+        setPendingFile(file);
+      } else {
+        applyFile(file);
+      }
+    },
+    [enableCrop, applyFile],
+  );
+
+  const handleCropConfirm = useCallback(
+    (croppedFile: File) => {
+      setPendingFile(null);
+      applyFile(croppedFile);
+    },
+    [applyFile],
+  );
+
+  const handleCropCancel = useCallback(() => {
+    setPendingFile(null);
+  }, []);
+
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
       setDragOver(false);
       const file = e.dataTransfer.files[0];
-      if (file) handleFile(file);
+      if (file) handleRawFile(file);
     },
-    [handleFile],
+    [handleRawFile],
   );
 
   const handleInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
-      if (file) handleFile(file);
+      if (file) handleRawFile(file);
       // Reset input so same file can be selected again
       e.target.value = '';
     },
-    [handleFile],
+    [handleRawFile],
   );
 
   const handleRemove = useCallback(() => {
@@ -131,7 +168,7 @@ export function ImageUploader({
             Click to upload or drag & drop
           </p>
           <p className="mt-1 text-xs text-gray-400">
-            PNG, JPG, WEBP (auto-converted)
+            PNG, JPG, WEBP{enableCrop ? ' — akan di-crop 1:1' : ' (auto-converted)'}
           </p>
         </div>
       )}
@@ -142,6 +179,17 @@ export function ImageUploader({
         onChange={handleInputChange}
         className="hidden"
       />
+
+      {/* Crop Modal */}
+      {enableCrop && (
+        <ImageCropModal
+          file={pendingFile}
+          maxResolution={maxResolution}
+          aspectRatio={cropAspectRatio}
+          onCancel={handleCropCancel}
+          onConfirm={handleCropConfirm}
+        />
+      )}
     </div>
   );
 }

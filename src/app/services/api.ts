@@ -501,8 +501,35 @@ class ApiService {
     });
   }
 
-  async getProductPrices(params: { storeId: string; productId?: string; customerTypeId?: string }) {
-    const searchParams = new URLSearchParams({ store_id: params.storeId });
+  async getPosShifts(params?: { storeId?: string; status?: string; businessDate?: string }) {
+    const query = new URLSearchParams();
+    if (params?.storeId) query.set('store_id', params.storeId);
+    if (params?.status) query.set('status', params.status);
+    if (params?.businessDate) query.set('business_date', params.businessDate);
+
+    const response = await this.request(`/ops/shifts${query.toString() ? `?${query.toString()}` : ''}`);
+    const rows = (response as { data?: ApiPosShiftPayload[] }).data;
+    return Array.isArray(rows) ? rows.map(normalisePosShift) : [];
+  }
+
+  async getPosShift(shiftId: string) {
+    const response = await this.request(`/ops/shifts/${shiftId}`);
+    const row = (response as { data?: ApiPosShiftPayload }).data;
+    return row ? normalisePosShift(row) : null;
+  }
+
+  async forceClosePosShift(shiftId: string, reason: string) {
+    const response = await this.request(`/ops/shifts/${shiftId}/force-close`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+    const row = (response as { data?: ApiPosShiftPayload }).data;
+    return row ? normalisePosShift(row) : null;
+  }
+
+  async getProductPrices(params: { storeId?: string; productId?: string; customerTypeId?: string }) {
+    const searchParams = new URLSearchParams();
+    if (params.storeId) searchParams.set('store_id', params.storeId);
     if (params.productId) searchParams.set('product_id', params.productId);
     if (params.customerTypeId) searchParams.set('customer_type_id', params.customerTypeId);
 
@@ -729,6 +756,13 @@ class ApiService {
     // Laravel resource collection returns data in 'data' field
     if (isRecord(response) && Array.isArray(response.data)) {
       response.data = response.data.map((attendance) => normaliseAttendancePayload(attendance as ApiAttendancePayload));
+    } else if (
+      isRecord(response) &&
+      isRecord(response.data) &&
+      Array.isArray((response.data as { data?: unknown }).data)
+    ) {
+      const paginatedData = response.data as { data: Attendance[] | ApiAttendancePayload[] };
+      paginatedData.data = paginatedData.data.map((attendance) => normaliseAttendancePayload(attendance as ApiAttendancePayload));
     }
     return response;
   }
@@ -1031,8 +1065,9 @@ class ApiService {
   }
 
   // Customer Type endpoints
-  async getCustomerTypes(storeId: string) {
-    const response = await this.request(`/customer-types?store_id=${storeId}`);
+  async getCustomerTypes(storeId?: string) {
+    const query = storeId ? `?store_id=${storeId}` : '';
+    const response = await this.request(`/customer-types${query}`);
     if (isRecord(response) && response.success && Array.isArray((response as any).data)) {
       return (response as any).data;
     }
@@ -1122,9 +1157,146 @@ class ApiService {
 
   async removeUserFromTenant(tenantId: string, userId: string): Promise<void> {
     await this.request(`/tenants/${tenantId}/users/${userId}`, {
-      method: 'DELETE',
-      headers: { 'X-Tenant-ID': tenantId }
+method: 'DELETE',
+headers: { 'X-Tenant-ID': tenantId }
     });
+  }
+
+  // Sales / Order endpoints
+  async getSalesSummary(params?: {
+    startDate?: string;
+    endDate?: string;
+    storeId?: string;
+    source?: string;
+  }) {
+    const searchParams = new URLSearchParams();
+    if (params?.startDate) searchParams.set('start_date', params.startDate);
+    if (params?.endDate) searchParams.set('end_date', params.endDate);
+    if (params?.storeId) searchParams.set('store_id', params.storeId);
+    if (params?.source) searchParams.set('source', params.source);
+
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    const response = await this.request(`/orders/summary${query}`);
+
+    if (isRecord(response) && response.success && response.data) {
+      return response.data as SalesSummary;
+    }
+
+    return null;
+  }
+
+  async getSalesChart(params?: {
+    startDate?: string;
+    endDate?: string;
+    startHour?: number;
+    endHour?: number;
+    storeId?: string;
+    source?: string;
+    createdBy?: string;
+    groupBy?: 'hour' | 'day' | 'week' | 'month';
+  }) {
+    const searchParams = new URLSearchParams();
+    if (params?.startDate) searchParams.set('start_date', params.startDate);
+    if (params?.endDate) searchParams.set('end_date', params.endDate);
+    if (params?.startHour !== undefined) searchParams.set('start_hour', String(params.startHour));
+    if (params?.endHour !== undefined) searchParams.set('end_hour', String(params.endHour));
+    if (params?.storeId) searchParams.set('store_id', params.storeId);
+    if (params?.source) searchParams.set('source', params.source);
+    if (params?.createdBy) searchParams.set('created_by', params.createdBy);
+    if (params?.groupBy) searchParams.set('group_by', params.groupBy);
+
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    const response = await this.request(`/orders/chart${query}`);
+
+    if (isRecord(response) && response.success && response.data) {
+      return response.data as SalesChart;
+    }
+
+    return null;
+  }
+
+  async getOrders(params?: {
+    storeId?: string;
+    status?: string;
+    source?: string;
+    startDate?: string;
+    endDate?: string;
+    search?: string;
+    perPage?: number;
+    page?: number;
+  }) {
+    const searchParams = new URLSearchParams();
+    if (params?.storeId) searchParams.set('store_id', params.storeId);
+    if (params?.status) searchParams.set('status', params.status);
+    if (params?.source) searchParams.set('source', params.source);
+    if (params?.startDate) searchParams.set('start_date', params.startDate);
+    if (params?.endDate) searchParams.set('end_date', params.endDate);
+    if (params?.search) searchParams.set('search', params.search);
+    if (params?.perPage) searchParams.set('per_page', params.perPage.toString());
+    if (params?.page) searchParams.set('page', params.page.toString());
+
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    const response = await this.request(`/orders${query}`);
+
+    return response;
+  }
+
+  async getOrder(orderId: string) {
+    const response = await this.request(`/orders/${orderId}`);
+    return response;
+  }
+
+  // Refund endpoints (manager/owner only)
+  async checkRefundEligibility(orderId: string): Promise<RefundEligibility> {
+    const response = await this.request(`/orders/${orderId}/refund-eligibility`);
+    const data = (response as { success?: boolean; data?: RefundEligibility })?.data;
+    if (!data) {
+      throw new ApiError('Failed to check refund eligibility', 500);
+    }
+    return data;
+  }
+
+  async processRefund(
+    orderId: string,
+    payload: RefundInput,
+  ): Promise<Refund> {
+    const response = await this.request(`/orders/${orderId}/refund`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    const data = (response as { success?: boolean; data?: Refund })?.data;
+    if (!data) {
+      throw new ApiError('Failed to process refund', 500);
+    }
+    return data;
+  }
+
+  async getRefunds(params?: {
+    orderId?: string;
+    storeId?: string;
+    status?: string;
+    refundType?: string;
+    startDate?: string;
+    endDate?: string;
+    perPage?: number;
+    page?: number;
+  }) {
+    const searchParams = new URLSearchParams();
+    if (params?.orderId) searchParams.set('order_id', params.orderId);
+    if (params?.storeId) searchParams.set('store_id', params.storeId);
+    if (params?.status) searchParams.set('status', params.status);
+    if (params?.refundType) searchParams.set('refund_type', params.refundType);
+    if (params?.startDate) searchParams.set('start_date', params.startDate);
+    if (params?.endDate) searchParams.set('end_date', params.endDate);
+    if (params?.perPage) searchParams.set('per_page', params.perPage.toString());
+    if (params?.page) searchParams.set('page', params.page.toString());
+
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    return this.request(`/refunds${query}`);
+  }
+
+  async getRefund(refundId: string) {
+    return this.request(`/refunds/${refundId}`);
   }
 }
 
@@ -1137,6 +1309,282 @@ export const getCategories = (token: string) => apiService.getCategories(token);
 export const createCategory = (token: string, data: { name: string }) => apiService.createCategory(token, data);
 export const updateCategory = (token: string, id: string, data: { name: string }) => apiService.updateCategory(token, id, data);
 export const deleteCategory = (token: string, id: string) => apiService.deleteCategory(token, id);
+
+// Sales / Order types
+export interface SalesSummaryBreakdownItem {
+  status?: string;
+  source?: string;
+  store_id?: string;
+  store_name?: string;
+  store_nickname?: string;
+  product_id?: string;
+  product_name?: string;
+  payment_type_id?: string;
+  payment_type_name?: string;
+  count: number;
+  total: number;
+  total_quantity?: number;
+  total_revenue?: number;
+  total_amount?: number;
+  order_count?: number;
+}
+
+export interface SalesSummary {
+  period: {
+    start_date: string;
+    end_date: string;
+    timezone: string;
+  };
+  filters: {
+    store_id: string | null;
+    source: string | null;
+  };
+  totals: {
+    total_orders: number;
+    total_subtotal: number;
+    total_discount: number;
+    total_tax: number;
+    total_service: number;
+    total_revenue: number;
+    average_order_value: number;
+  };
+  by_status: SalesSummaryBreakdownItem[];
+  by_source: SalesSummaryBreakdownItem[];
+  by_store: SalesSummaryBreakdownItem[];
+  top_products: SalesSummaryBreakdownItem[];
+  by_payment_type: SalesSummaryBreakdownItem[];
+}
+
+export interface SalesChartSeriesItem {
+  period: string;
+  gross_sales: number;
+  refunds: number;
+  discounts: number;
+  net_sales: number;
+  gross_profit: number;
+  cogs: number;
+  order_count: number;
+}
+
+export interface SalesChart {
+  period: {
+    start_date: string;
+    end_date: string;
+    timezone: string;
+  };
+  filters: {
+    store_id: string | null;
+    source: string | null;
+    created_by: string | null;
+    start_hour: number | null;
+    end_hour: number | null;
+    group_by: string;
+  };
+  totals: {
+    gross_sales: number;
+    refunds: number;
+    discounts: number;
+    net_sales: number;
+    gross_profit: number;
+    cogs: number;
+    order_count: number;
+  };
+  series: SalesChartSeriesItem[];
+}
+
+// Receipt / Order detail types
+export interface ReceiptItemVariant {
+  id: string;
+  product_variant_id: string | null;
+  name: string;
+  price: number;
+}
+
+export interface ReceiptItemModification {
+  id: string;
+  product_modification_id: string | null;
+  price: number;
+  quantity: number;
+}
+
+export interface ReceiptItem {
+  id: string;
+  order_id: string;
+  /**
+   * Product name. Prefer reading from `product_snapshot.name`; this field is
+   * kept for backward compatibility and is populated from the snapshot when
+   * the backend OrderItem model exposes its `name_snapshot` accessor.
+   */
+  name_snapshot?: string;
+  product_snapshot?: { id?: string | null; name?: string | null; price?: number | null } | null;
+  /**
+   * Variant snapshot stored on the order item.
+   * Shape varies by source:
+   *  - api-mobile guest: `{ id, name, price }` (single object)
+   *  - api-ops POS: `Array<{ id, name, price }>` (array)
+   *  - legacy: `Array<ReceiptItemVariant>`
+   */
+  variant_snapshot?:
+    | { id?: string | null; name?: string | null; price?: number | null }
+    | Array<{ id?: string | null; name?: string | null; price?: number | null }>
+    | null;
+  modifications_snapshot?: Array<{ name?: string | null; price?: number | null; quantity?: number | null }> | null;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  notes: string | null;
+  variants?: ReceiptItemVariant[];
+  order_item_modifications?: ReceiptItemModification[];
+}
+
+/**
+ * Helper to resolve an order item's display name regardless of whether it
+ * comes from the legacy `name_snapshot` column or the new `product_snapshot`
+ * JSON payload.
+ */
+export function getReceiptItemName(item: ReceiptItem): string {
+  return (
+    item.name_snapshot ??
+    item.product_snapshot?.name ??
+    'Unknown Product'
+  );
+}
+
+export interface ReceiptPayment {
+  id: string;
+  order_id: string;
+  amount: number;
+  payment_type_id: string | null;
+  reference: string | null;
+  captured_at: string | null;
+  is_offline: boolean;
+}
+
+export interface ReceiptStore {
+  id: string;
+  name: string;
+  nickname: string | null;
+  address?: string | null;
+  phone?: string | null;
+  receipt_header?: string | null;
+  receipt_footer?: string | null;
+}
+
+export interface Receipt {
+  id: string;
+  tenant_id: string;
+  store_id: string;
+  shift_session_id: string | null;
+  created_by: string | null;
+  customer_name: string | null;
+  table_code: string | null;
+  status: 'pending' | 'completed' | 'cancelled' | 'refunded';
+  subtotal: number;
+  discount_total: number;
+  tax_total: number;
+  service_total: number;
+  grand_total: number;
+  payment_type_id: string | null;
+  paid_at: string | null;
+  source: string;
+  device_identifier: string | null;
+  is_offline: boolean;
+  synced_at: string | null;
+  customer_type_id: string | null;
+  proof_of_payment: string | null;
+  payment_snapshot: Record<string, unknown> | null;
+  customer_type_snapshot: Record<string, unknown> | null;
+  receipt_number: string;
+  time_ago: string;
+  created_at: string;
+  updated_at: string;
+  // relations
+  store?: ReceiptStore | null;
+  order_items?: ReceiptItem[];
+  order_payments?: ReceiptPayment[];
+}
+
+export interface ReceiptsPaginatedResponse {
+  current_page: number;
+  data: Receipt[];
+  from: number | null;
+  last_page: number;
+  per_page: number;
+  to: number | null;
+  total: number;
+}
+
+// Refund types
+export interface RefundItemSummary {
+  id: string;
+  order_item_id: string;
+  product_name: string;
+  quantity_refunded: number;
+  unit_price: number;
+  total_refund_amount: number;
+  reason: string | null;
+}
+
+export interface Refund {
+  id: string;
+  order_id: string;
+  refund_number: string;
+  refund_type: 'full' | 'partial';
+  total_amount: number;
+  reason: string | null;
+  notes: string | null;
+  status: 'pending' | 'approved' | 'rejected' | 'completed';
+  payment_method: string | null;
+  refunded_by: string | null;
+  refunded_at: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  order?: {
+    id: string;
+    receipt_number: string;
+    store_id: string;
+    store_name: string | null;
+    grand_total: number;
+    customer_name: string | null;
+    created_at: string | null;
+  } | null;
+  items: RefundItemSummary[];
+}
+
+export interface RefundEligibilityItem {
+  order_item_id: string;
+  product_name: string;
+  quantity: number;
+  quantity_refunded: number;
+  quantity_pending_refund: number;
+  available_quantity: number;
+  unit_price: number;
+  max_refund_amount: number;
+}
+
+export interface RefundEligibility {
+  order: {
+    id: string;
+    receipt_number: string;
+    grand_total: number;
+    total_refunded: number;
+    available_refund_amount: number;
+  };
+  available_items: RefundEligibilityItem[];
+}
+
+export interface RefundInputItem {
+  order_item_id: string;
+  quantity: number;
+  reason?: string | null;
+}
+
+export interface RefundInput {
+  items: RefundInputItem[];
+  reason: string;
+  notes?: string | null;
+  payment_method?: string | null;
+}
 
 // Data models
 export interface Role {
@@ -1185,6 +1633,7 @@ export interface ProductVariant {
   price?: number | null;
   stock?: number | null;
   isActive?: boolean;
+  sortOrder?: number;
   productVariantGroupId?: string | null;
   availableWithVariants?: string[];
   createdAt?: string;
@@ -1236,6 +1685,10 @@ export interface ProductModification {
   name: string;
   price?: number | null;
   isActive?: boolean;
+  sortOrder?: number;
+  linkedProductId?: string | null;
+  linkedProductQuantity?: number | null;
+  linkedProduct?: ProductBundleComponent | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -1288,7 +1741,7 @@ export interface Product {
   categoryDetail?: { id: string; name: string } | null;
   tenant?: { id: string; name: string } | null;
   user?: { id: string; name: string; email: string } | null;
-  stores?: { id: string; name: string; price?: number | null }[];
+  stores?: { id: string; name: string; price?: number | null; stock?: number | null }[];
   storeIds?: string[];
   variants?: ProductVariant[];
   variantGroups?: ProductVariantGroup[];
@@ -1307,6 +1760,7 @@ export interface ProductVariantInput {
   price?: number | null;
   stock?: number | null;
   isActive?: boolean;
+  sortOrder?: number;
   productVariantGroupId?: string;
   availableWithVariants?: string[];
 }
@@ -1330,6 +1784,9 @@ export interface ProductModificationInput {
   name: string;
   price?: number | null;
   isActive?: boolean;
+  sortOrder?: number;
+  linkedProductId?: string | null;
+  linkedProductQuantity?: number | null;
 }
 
 export interface ProductInput {
@@ -1355,8 +1812,43 @@ export interface ProductInput {
   variant_groups?: ProductVariantGroupInput[];
   modifications?: ProductModificationInput[];
   bundle_items?: ProductBundleItemInput[];
-  stores?: { id: string; price?: number | null }[];
+  stores?: { id: string; price?: number | null; stock?: number | null }[];
   store_ids?: string[];
+}
+
+export interface PosShiftStockItem {
+  id: string;
+  productId: string;
+  product?: { id: string; name: string; sku?: string | null } | null;
+  openingStock: number;
+  additionStock: number;
+  soldQuantity: number;
+  expectedClosingStock: number;
+  actualClosingStock?: number | null;
+  variance?: number | null;
+  openingVariance?: number | null;
+  openingVarianceNote?: string | null;
+  closingNote?: string | null;
+}
+
+export interface PosShift {
+  id: string;
+  tenantId?: string | null;
+  storeId: string;
+  store?: { id: string; name: string; nickname?: string | null } | null;
+  openedByUserId?: string | null;
+  closedByUserId?: string | null;
+  openedAt?: string | null;
+  closedAt?: string | null;
+  businessDate?: string | null;
+  status: 'open' | 'closed' | 'force_closed' | 'overdue' | string;
+  rawStatus?: string | null;
+  openingNote?: string | null;
+  closingNote?: string | null;
+  isForceClosed: boolean;
+  forceCloseReason?: string | null;
+  stockItemsCount: number;
+  items?: PosShiftStockItem[];
 }
 
 export interface Store {
@@ -1381,6 +1873,8 @@ export interface Store {
   receipt_footer?: string | null;
   email_receipt_logo?: string | null;
   print_receipt_logo?: string | null;
+  email_receipt_logo_url?: string | null;
+  print_receipt_logo_url?: string | null;
   address?: string | null;
   phone?: string | null;
   payment_methods?: PaymentMethod[];
@@ -1702,6 +2196,8 @@ interface ApiStorePayload {
   receipt_footer?: string | null;
   email_receipt_logo?: string | null;
   print_receipt_logo?: string | null;
+  email_receipt_logo_url?: string | null;
+  print_receipt_logo_url?: string | null;
   address?: string | null;
   phone?: string | null;
   created_at?: string;
@@ -1723,6 +2219,7 @@ interface ApiProductStorePayload {
   id: string;
   name: string;
   price?: number | string | null;
+  stock?: number | string | null;
 }
 
 interface ApiProductVariantPayload {
@@ -1732,6 +2229,7 @@ interface ApiProductVariantPayload {
   price?: number | string | null;
   stock?: number | string | null;
   is_active?: boolean;
+  sort_order?: number | string | null;
   product_variant_group_id?: string | null;
   available_with_variants?: string[] | null;
   created_at?: string | null;
@@ -1775,6 +2273,17 @@ interface ApiProductModificationPayload {
   name: string;
   price?: number | string | null;
   is_active?: boolean;
+  sort_order?: number | string | null;
+  linked_product_id?: string | null;
+  linked_product_quantity?: number | string | null;
+  linked_product?: {
+    id: string;
+    name: string;
+    sku?: string | null;
+    price?: number | string | null;
+    stock?: number | string | null;
+    is_active?: boolean;
+  } | null;
   created_at?: string | null;
   updated_at?: string | null;
 }
@@ -1827,6 +2336,41 @@ interface ApiProductPayload {
   bundle_available_stock?: number | string | null;
   created_at?: string | null;
   updated_at?: string | null;
+}
+
+interface ApiPosShiftStockItemPayload {
+  id: string;
+  product_id: string;
+  product?: { id: string; name: string; sku?: string | null } | null;
+  opening_stock?: number | string | null;
+  addition_stock?: number | string | null;
+  sold_quantity?: number | string | null;
+  expected_closing_stock?: number | string | null;
+  actual_closing_stock?: number | string | null;
+  variance?: number | string | null;
+  opening_variance?: number | string | null;
+  opening_variance_note?: string | null;
+  closing_note?: string | null;
+}
+
+interface ApiPosShiftPayload {
+  id: string;
+  tenant_id?: string | null;
+  store_id: string;
+  store?: { id: string; name: string; nickname?: string | null } | null;
+  opened_by_user_id?: string | null;
+  closed_by_user_id?: string | null;
+  opened_at?: string | null;
+  closed_at?: string | null;
+  business_date?: string | null;
+  status: string;
+  raw_status?: string | null;
+  opening_note?: string | null;
+  closing_note?: string | null;
+  is_force_closed?: boolean | number | null;
+  force_close_reason?: string | null;
+  stock_items_count?: number | string | null;
+  items?: ApiPosShiftStockItemPayload[] | null;
 }
 
 interface ApiShiftStorePayload {
@@ -1971,6 +2515,7 @@ function normaliseProduct(product: ApiProductPayload): Product {
       id: String(store.id ?? ''),
       name: String(store.name ?? ''),
       price: store.price != null ? toNumber(store.price, 0) : undefined,
+      stock: store.stock != null ? toNumber(store.stock, 0) : undefined,
     }))
     : undefined;
 
@@ -2007,6 +2552,7 @@ function normaliseProduct(product: ApiProductPayload): Product {
           price: toNumber(variant.price ?? null, 0),
           stock: toNumber(variant.stock ?? null, 0),
           isActive: typeof variant.is_active === 'boolean' ? variant.is_active : true,
+          sortOrder: toNumber(variant.sort_order ?? 0, 0),
           productVariantGroupId: String(group.id ?? ''),
           availableWithVariants: Array.isArray(variant.available_with_variants)
             ? variant.available_with_variants
@@ -2024,6 +2570,21 @@ function normaliseProduct(product: ApiProductPayload): Product {
       name: String(modification.name ?? ''),
       price: toNumber(modification.price ?? null, 0),
       isActive: typeof modification.is_active === 'boolean' ? modification.is_active : true,
+      sortOrder: toNumber(modification.sort_order ?? 0, 0),
+      linkedProductId: modification.linked_product_id ?? null,
+      linkedProductQuantity: modification.linked_product_quantity != null
+        ? toNumber(modification.linked_product_quantity, 1)
+        : null,
+      linkedProduct: modification.linked_product
+        ? {
+          id: String(modification.linked_product.id ?? ''),
+          name: String(modification.linked_product.name ?? ''),
+          sku: modification.linked_product.sku ?? null,
+          price: toNumber(modification.linked_product.price ?? null, 0),
+          stock: toNumber(modification.linked_product.stock ?? null, 0),
+          isActive: typeof modification.linked_product.is_active === 'boolean' ? modification.linked_product.is_active : true,
+        }
+        : null,
       createdAt: modification.created_at ?? undefined,
       updatedAt: modification.updated_at ?? undefined,
     }))
@@ -2127,6 +2688,76 @@ function normaliseProductPrice(price: ApiProductPricePayload): ProductPrice {
   };
 }
 
+function normalisePosShift(shift: ApiPosShiftPayload): PosShift {
+  const toShiftNumber = (value: unknown, fallback = 0): number => {
+    if (value === null || value === undefined || value === '') {
+      return fallback;
+    }
+
+    const numberValue = typeof value === 'number' ? value : Number(value);
+    return Number.isFinite(numberValue) ? numberValue : fallback;
+  };
+
+  return {
+    id: String(shift.id ?? ''),
+    tenantId: shift.tenant_id ?? null,
+    storeId: String(shift.store_id ?? ''),
+    store: shift.store
+      ? {
+        id: String(shift.store.id ?? ''),
+        name: String(shift.store.name ?? ''),
+        nickname: shift.store.nickname ?? null,
+      }
+      : null,
+    openedByUserId: shift.opened_by_user_id ?? null,
+    closedByUserId: shift.closed_by_user_id ?? null,
+    openedAt: shift.opened_at ?? null,
+    closedAt: shift.closed_at ?? null,
+    businessDate: shift.business_date ?? null,
+    status: shift.status,
+    rawStatus: shift.raw_status ?? null,
+    openingNote: shift.opening_note ?? null,
+    closingNote: shift.closing_note ?? null,
+    isForceClosed: Boolean(shift.is_force_closed),
+    forceCloseReason: shift.force_close_reason ?? null,
+    stockItemsCount: toShiftNumber(shift.stock_items_count ?? null, 0),
+    items: Array.isArray(shift.items)
+      ? shift.items.map((item) => ({
+        id: String(item.id ?? ''),
+        productId: String(item.product_id ?? ''),
+        product: item.product
+          ? {
+            id: String(item.product.id ?? ''),
+            name: String(item.product.name ?? ''),
+            sku: item.product.sku ?? null,
+          }
+          : null,
+        openingStock: toShiftNumber(item.opening_stock ?? null, 0),
+        additionStock: toShiftNumber(item.addition_stock ?? null, 0),
+        soldQuantity: toShiftNumber(item.sold_quantity ?? null, 0),
+        expectedClosingStock: toShiftNumber(item.expected_closing_stock ?? null, 0),
+        actualClosingStock: item.actual_closing_stock != null ? toShiftNumber(item.actual_closing_stock, 0) : null,
+        variance: item.variance != null ? toShiftNumber(item.variance, 0) : null,
+        openingVariance: item.opening_variance != null ? toShiftNumber(item.opening_variance, 0) : null,
+        openingVarianceNote: item.opening_variance_note ?? null,
+        closingNote: item.closing_note ?? null,
+      }))
+      : undefined,
+  };
+}
+
+/**
+ * Resolve a relative image path to a full URL using the img service.
+ * If the path is already a full URL, return it as-is.
+ */
+function resolveImageUrl(path: string | null | undefined): string | null {
+  if (!path) return null;
+  if (path.startsWith('http')) return path;
+  const imgBaseUrl = (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_IMG_URL)
+    || 'https://img.sagansa.id';
+  return `${imgBaseUrl}/storage/${path}`;
+}
+
 function normaliseStore(store: ApiStorePayload): Store {
   const normaliseCoordinate = (value: number | string | null | undefined): number | null => {
     if (value === null || value === undefined || value === '') {
@@ -2153,6 +2784,8 @@ function normaliseStore(store: ApiStorePayload): Store {
     receipt_footer: store.receipt_footer ?? null,
     email_receipt_logo: store.email_receipt_logo ?? null,
     print_receipt_logo: store.print_receipt_logo ?? null,
+    email_receipt_logo_url: store.email_receipt_logo_url ?? resolveImageUrl(store.email_receipt_logo),
+    print_receipt_logo_url: store.print_receipt_logo_url ?? resolveImageUrl(store.print_receipt_logo),
     address: store.address ?? null,
     phone: store.phone ?? null,
     created_at: store.created_at,
@@ -2246,6 +2879,7 @@ function buildProductJsonPayload(input: ProductInput) {
     payload.stores = input.stores.map((store) => ({
       id: store.id,
       price: store.price != null ? Math.round(store.price) : null,
+      stock: store.stock != null ? Math.max(0, Math.round(store.stock)) : null,
     }));
 
     if (input.store_ids === undefined) {
@@ -2269,25 +2903,30 @@ function buildProductJsonPayload(input: ProductInput) {
 
 
   if (input.variant_groups !== undefined) {
-    payload.variant_groups = input.variant_groups.map((group) => ({
+    payload.variant_groups = input.variant_groups.map((group, groupIndex) => ({
       name: group.name,
       is_required: group.isRequired,
-      variants: group.variants.map((variant) => ({
+      order: groupIndex,
+      variants: group.variants.map((variant, variantIndex) => ({
         name: variant.name,
         sku: variant.sku ?? null,
         price: variant.price ?? 0,
         stock: variant.stock ?? 0,
         is_active: variant.isActive ?? true,
+        sort_order: variant.sortOrder ?? variantIndex,
         available_with_variants: variant.availableWithVariants ?? null,
       })),
     }));
   }
 
   if (input.modifications !== undefined) {
-    payload.modifications = input.modifications.map((modification) => ({
+    payload.modifications = input.modifications.map((modification, index) => ({
       name: modification.name,
       price: modification.price ?? 0,
       is_active: modification.isActive ?? true,
+      sort_order: modification.sortOrder ?? index,
+      linked_product_id: modification.linkedProductId || null,
+      linked_product_quantity: modification.linkedProductId ? (modification.linkedProductQuantity ?? 1) : null,
     }));
   }
 

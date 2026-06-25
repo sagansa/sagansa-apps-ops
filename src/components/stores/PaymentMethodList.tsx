@@ -73,12 +73,12 @@ const getPaymentDetail = (method: PaymentMethod) => {
         }
 
         return (
-            <div className="max-w-md space-y-2">
-                <div className="grid gap-x-4 gap-y-1 sm:grid-cols-2">
+            <div className="min-w-0 max-w-full space-y-2">
+                <div className="grid min-w-0 gap-x-5 gap-y-1 xl:grid-cols-2">
                     {summaryItems.map((item) => (
-                        <div key={item.label} className="text-xs">
+                        <div key={item.label} className="min-w-0 text-xs leading-5">
                             <span className="text-muted-foreground">{item.label}: </span>
-                            <span className="break-words font-medium">{item.value}</span>
+                            <span className="break-words font-medium text-gray-900">{item.value}</span>
                         </div>
                     ))}
                 </div>
@@ -123,21 +123,21 @@ export default function PaymentMethodList({
     }
 
     return (
-        <Card>
+        <Card className="overflow-hidden">
             <Table>
                 <TableHeader>
                     <TableRow>
-                        <TableHead>Metode Pembayaran</TableHead>
-                        <TableHead>Tipe</TableHead>
+                        <TableHead className="w-[240px]">Metode Pembayaran</TableHead>
+                        <TableHead className="w-[100px]">Tipe</TableHead>
                         <TableHead>Detail</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Aksi</TableHead>
+                        <TableHead className="w-[120px]">Status</TableHead>
+                        <TableHead className="w-[112px] text-right">Aksi</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
                     {paymentMethods.map((method) => (
                         <TableRow key={method.id}>
-                            <TableCell>
+                            <TableCell className="align-top">
                                 <div className="flex items-center gap-3">
                                     <div className={`p-2 rounded-lg ${getPaymentTypeColor(method.type)} overflow-hidden relative`}>
                                         {method.details?.image ? (
@@ -167,15 +167,15 @@ export default function PaymentMethodList({
                                     </div>
                                 </div>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="align-top">
                                 <Badge variant="outline" className="capitalize">
                                     {method.type}
                                 </Badge>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="min-w-0 max-w-[420px] whitespace-normal align-top">
                                 {getPaymentDetail(method)}
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="align-top">
                                 <Button
                                     variant="ghost"
                                     size="sm"
@@ -195,7 +195,7 @@ export default function PaymentMethodList({
                                     )}
                                 </Button>
                             </TableCell>
-                            <TableCell className="text-right">
+                            <TableCell className="align-top text-right">
                                 <div className="flex items-center justify-end gap-1">
                                     <Button
                                         // variant="ghost"

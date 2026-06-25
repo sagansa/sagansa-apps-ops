@@ -3,14 +3,14 @@
 import ProtectedRoute from '@/components/ProtectedRoute';
 import AdminLayout from '@/components/AdminLayout';
 import { StoreProvider } from '@/app/contexts/StoreContext';
-import DashboardClient from './DashboardClient';
+import TransactionsClient from './TransactionsClient';
 
-export default function DashboardPage() {
+export default function TransactionsPage() {
   return (
     <ProtectedRoute requiredRole="admin">
       <StoreProvider>
         <AdminLayout>
-          <DashboardClient />
+          <TransactionsClient />
         </AdminLayout>
       </StoreProvider>
     </ProtectedRoute>

@@ -2,7 +2,10 @@
 
 import { Store } from '@/app/services/api';
 import { Button } from '@/components/ui';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useImageField } from '@/hooks/useImageField';
+import { ImageUploader } from '@/components/ui/ImageUploader';
+import { FormField } from '@/components/ui/FormField';
 
 interface ReceiptConfigFormProps {
     selectedStores: Store[];
@@ -16,6 +19,8 @@ export interface ReceiptConfigData {
     receipt_footer?: string | null;
     email_receipt_logo?: File | null;
     print_receipt_logo?: File | null;
+    remove_email_receipt_logo?: boolean;
+    remove_print_receipt_logo?: boolean;
     address?: string | null;
     phone?: string | null;
 }
@@ -30,66 +35,29 @@ export default function ReceiptConfigForm({
     const [receiptFooter, setReceiptFooter] = useState('');
     const [address, setAddress] = useState('');
     const [phone, setPhone] = useState('');
-    const [emailLogo, setEmailLogo] = useState<File | null>(null);
-    const [printLogo, setPrintLogo] = useState<File | null>(null);
-    const [emailLogoPreview, setEmailLogoPreview] = useState<string | null>(null);
-    const [printLogoPreview, setPrintLogoPreview] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
 
-    // Load data when single store is selected
+    // Derive current store image URLs for the image fields
+    const currentStore = !isBulkMode && selectedStores.length === 1 ? selectedStores[0] : null;
+
+    const emailLogoUrl = currentStore?.email_receipt_logo_url || currentStore?.email_receipt_logo || null;
+    const printLogoUrl = currentStore?.print_receipt_logo_url || currentStore?.print_receipt_logo || null;
+
+    const emailLogo = useImageField({
+        currentImageUrl: emailLogoUrl,
+        hasExistingImage: !!emailLogoUrl,
+    });
+
+    const printLogo = useImageField({
+        currentImageUrl: printLogoUrl,
+        hasExistingImage: !!printLogoUrl,
+    });
+
+    // Reset image fields when store selection changes
     useEffect(() => {
-        if (!isBulkMode && selectedStores.length === 1) {
-            const store = selectedStores[0];
-            setReceiptHeader(store.receipt_header || '');
-            setReceiptFooter(store.receipt_footer || '');
-            setAddress(store.address || '');
-            setPhone(store.phone || '');
-            setEmailLogo(null);
-            setPrintLogo(null);
-            setEmailLogoPreview(store.email_receipt_logo || null);
-            setPrintLogoPreview(store.print_receipt_logo || null);
-        } else if (isBulkMode) {
-            // Clear form for bulk mode
-            setReceiptHeader('');
-            setReceiptFooter('');
-            setAddress('');
-            setPhone('');
-            setEmailLogo(null);
-            setPrintLogo(null);
-            setEmailLogoPreview(null);
-            setPrintLogoPreview(null);
-        } else {
-            // Clear form if no store or multiple stores selected without bulk mode
-            setReceiptHeader('');
-            setReceiptFooter('');
-            setAddress('');
-            setPhone('');
-            setEmailLogo(null);
-            setPrintLogo(null);
-            setEmailLogoPreview(null);
-            setPrintLogoPreview(null);
-        }
+        emailLogo.reset();
+        printLogo.reset();
     }, [selectedStores, isBulkMode]);
-
-    const handleEmailLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0] || null;
-        setEmailLogo(file);
-        if (file) {
-            setEmailLogoPreview(URL.createObjectURL(file));
-        } else {
-            setEmailLogoPreview(null);
-        }
-    };
-
-    const handlePrintLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0] || null;
-        setPrintLogo(file);
-        if (file) {
-            setPrintLogoPreview(URL.createObjectURL(file));
-        } else {
-            setPrintLogoPreview(null);
-        }
-    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -100,19 +68,41 @@ export default function ReceiptConfigForm({
             receipt_footer: receiptFooter.trim() || null,
             address: address.trim() || null,
             phone: phone.trim() || null,
-            email_receipt_logo: emailLogo,
-            print_receipt_logo: printLogo,
+            email_receipt_logo: emailLogo.file,
+            print_receipt_logo: printLogo.file,
+            remove_email_receipt_logo: emailLogo.shouldRemove,
+            remove_print_receipt_logo: printLogo.shouldRemove,
         };
 
         try {
             await onSave(data);
-            // Reset file previews after save
-            setEmailLogoPreview(null);
-            setPrintLogoPreview(null);
+            emailLogo.reset();
+            printLogo.reset();
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to save');
         }
     };
+
+    // Load data when single store is selected
+    useEffect(() => {
+        if (!isBulkMode && selectedStores.length === 1) {
+            const store = selectedStores[0];
+            setReceiptHeader(store.receipt_header || '');
+            setReceiptFooter(store.receipt_footer || '');
+            setAddress(store.address || '');
+            setPhone(store.phone || '');
+        } else if (isBulkMode) {
+            setReceiptHeader('');
+            setReceiptFooter('');
+            setAddress('');
+            setPhone('');
+        } else {
+            setReceiptHeader('');
+            setReceiptFooter('');
+            setAddress('');
+            setPhone('');
+        }
+    }, [selectedStores, isBulkMode]);
 
     if (selectedStores.length === 0) {
         return (
@@ -233,72 +223,30 @@ export default function ReceiptConfigForm({
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Email Receipt Logo {isBulkMode && <span className="text-gray-500">(optional)</span>}
-                            </label>
-                            <label className="relative cursor-pointer block">
-                                <div
-                                    className="w-28 h-28 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center hover:border-indigo-500 transition-colors overflow-hidden bg-gray-50"
-                                >
-                                    {emailLogoPreview ? (
-                                        <img
-                                            src={emailLogoPreview}
-                                            alt="Email logo preview"
-                                            className="w-full h-full object-contain"
-                                        />
-                                    ) : (
-                                        <>
-                                            <svg className="w-12 h-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                            </svg>
-                                            <p className="mt-2 text-sm text-gray-500">Click to upload</p>
-                                            <p className="text-xs text-gray-400 mt-1">Square image, max 2MB</p>
-                                        </>
-                                    )}
-                                </div>
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleEmailLogoChange}
-                                    className="hidden"
-                                />
-                            </label>
-                        </div>
+                    <div className="grid grid-cols-2 gap-6">
+                        <FormField label={`Email Receipt Logo ${isBulkMode ? '(optional)' : ''}`}>
+                            <ImageUploader
+                                {...emailLogo.uploaderProps}
+                                enableCrop={true}
+                                cropAspectRatio={1}
+                                maxResolution={600}
+                            />
+                            <p className="mt-1 text-xs text-gray-500">
+                                Logo untuk email receipt. Akan di-crop 1:1 dan dikonversi ke WebP.
+                            </p>
+                        </FormField>
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Print Receipt Logo {isBulkMode && <span className="text-gray-500">(optional)</span>}
-                            </label>
-                            <label className="relative cursor-pointer block">
-                                <div
-                                    className="w-28 h-28 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center hover:border-indigo-500 transition-colors overflow-hidden bg-gray-50"
-                                >
-                                    {printLogoPreview ? (
-                                        <img
-                                            src={printLogoPreview}
-                                            alt="Print logo preview"
-                                            className="w-full h-full object-contain"
-                                        />
-                                    ) : (
-                                        <>
-                                            <svg className="w-12 h-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                            </svg>
-                                            <p className="mt-2 text-sm text-gray-500">Click to upload</p>
-                                            <p className="text-xs text-gray-400 mt-1">Square image, max 2MB</p>
-                                        </>
-                                    )}
-                                </div>
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handlePrintLogoChange}
-                                    className="hidden"
-                                />
-                            </label>
-                        </div>
+                        <FormField label={`Print Receipt Logo ${isBulkMode ? '(optional)' : ''}`}>
+                            <ImageUploader
+                                {...printLogo.uploaderProps}
+                                enableCrop={true}
+                                cropAspectRatio={1}
+                                maxResolution={600}
+                            />
+                            <p className="mt-1 text-xs text-gray-500">
+                                Logo untuk print receipt. Akan di-crop 1:1 dan dikonversi ke WebP.
+                            </p>
+                        </FormField>
                     </div>
                 </div>
 

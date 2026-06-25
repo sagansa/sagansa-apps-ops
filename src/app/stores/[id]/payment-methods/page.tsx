@@ -43,6 +43,7 @@ function PaymentMethodsContent() {
     const [loading, setLoading] = useState(true);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingMethod, setEditingMethod] = useState<PaymentMethod | undefined>(undefined);
+    const storeDisplayName = store?.nickname?.trim() || store?.name || '';
 
     const fetchData = useCallback(async () => {
         try {
@@ -178,8 +179,11 @@ function PaymentMethodsContent() {
                     Kembali ke Daftar Store
                 </button>
                 <h1 className="text-2xl font-semibold text-gray-900">
-                    Pengaturan Pembayaran - {store.name}
+                    Pengaturan Pembayaran - {storeDisplayName}
                 </h1>
+                {store.nickname?.trim() ? (
+                    <p className="mt-1 text-sm text-gray-500">{store.name}</p>
+                ) : null}
             </div>
 
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">

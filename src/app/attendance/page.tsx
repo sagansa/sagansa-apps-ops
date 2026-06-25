@@ -48,7 +48,12 @@ function AttendanceContent() {
       const response = await apiService.getAttendances(filters);
       console.log('Attendance API response:', response);
       const r = response as Record<string, unknown>;
-      const data = (r as Record<string, unknown>).data;
+      const dataField = r.data;
+      const data = Array.isArray(dataField)
+        ? dataField
+        : dataField && typeof dataField === 'object' && Array.isArray((dataField as { data?: unknown }).data)
+          ? (dataField as { data: unknown[] }).data
+          : [];
       console.log('Attendance data from response:', data);
       if (Array.isArray(data)) {
         setAttendances(data as Attendance[]);

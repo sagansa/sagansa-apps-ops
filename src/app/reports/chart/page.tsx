@@ -3,14 +3,14 @@
 import ProtectedRoute from '@/components/ProtectedRoute';
 import AdminLayout from '@/components/AdminLayout';
 import { StoreProvider } from '@/app/contexts/StoreContext';
-import DashboardClient from './DashboardClient';
+import ChartClient from './ChartClient';
 
-export default function DashboardPage() {
+export default function SalesChartPage() {
   return (
     <ProtectedRoute requiredRole="admin">
       <StoreProvider>
         <AdminLayout>
-          <DashboardClient />
+          <ChartClient />
         </AdminLayout>
       </StoreProvider>
     </ProtectedRoute>

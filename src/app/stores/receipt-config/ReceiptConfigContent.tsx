@@ -93,15 +93,27 @@ export default function ReceiptConfigContent() {
                     if (data.receipt_footer) updateData.receipt_footer = data.receipt_footer;
                     if (data.address) updateData.address = data.address;
                     if (data.phone) updateData.phone = data.phone;
-                    if (data.email_receipt_logo) updateData.email_receipt_logo = data.email_receipt_logo;
-                    if (data.print_receipt_logo) updateData.print_receipt_logo = data.print_receipt_logo;
                 } else {
                     updateData.receipt_header = data.receipt_header || null;
                     updateData.receipt_footer = data.receipt_footer || null;
                     updateData.address = data.address || null;
                     updateData.phone = data.phone || null;
-                    if (data.email_receipt_logo) updateData.email_receipt_logo = data.email_receipt_logo;
-                    if (data.print_receipt_logo) updateData.print_receipt_logo = data.print_receipt_logo;
+                }
+
+                // Handle email receipt logo
+                if (data.email_receipt_logo) {
+                    updateData.email_receipt_logo = data.email_receipt_logo;
+                } else if (data.remove_email_receipt_logo) {
+                    updateData.email_receipt_logo = null;
+                    updateData.remove_email_receipt_logo = true;
+                }
+
+                // Handle print receipt logo
+                if (data.print_receipt_logo) {
+                    updateData.print_receipt_logo = data.print_receipt_logo;
+                } else if (data.remove_print_receipt_logo) {
+                    updateData.print_receipt_logo = null;
+                    updateData.remove_print_receipt_logo = true;
                 }
 
                 return apiService.updateStore(user.tenant!.id, storeId, updateData);

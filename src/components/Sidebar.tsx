@@ -23,7 +23,23 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { useAuth } from '@/app/contexts/AuthContext';
-import { ChevronRight } from 'lucide-react';
+import {
+  ChevronRight,
+  LayoutDashboard,
+  Users,
+  UserCheck,
+  Store,
+  Building2,
+  ShoppingCart,
+  Clock,
+  BarChart3,
+  TrendingUp,
+  CalendarCheck,
+  CalendarOff,
+  Shield,
+  Receipt,
+  type LucideIcon,
+} from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useMemo } from 'react';
@@ -31,36 +47,39 @@ import { useMemo } from 'react';
 type NavItem = {
   name: string;
   href: string;
+  icon: LucideIcon;
   role?: 'admin' | 'super-admin' | 'user';
 };
 
 const generalNavigation: NavItem[] = [
-  { name: 'Dashboard', href: '/dashboard', role: 'admin' },
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, role: 'admin' },
 ];
 
 const managementNavigation: NavItem[] = [
-  { name: 'Users', href: '/users', role: 'super-admin' },
-  { name: 'Team Members', href: '/team-members', role: 'admin' },
-  { name: 'Stores', href: '/stores', role: 'admin' },
-  { name: 'Store Groups', href: '/store-groups', role: 'admin' },
-  { name: 'Point of Sale', href: '/point-of-sale', role: 'admin' },
-  { name: 'Shift Management', href: '/shift-management', role: 'admin' },
+  { name: 'Users', href: '/users', icon: Users, role: 'super-admin' },
+  { name: 'Team Members', href: '/team-members', icon: UserCheck, role: 'admin' },
+  { name: 'Stores', href: '/stores', icon: Store, role: 'admin' },
+  { name: 'Store Groups', href: '/store-groups', icon: Building2, role: 'admin' },
+  { name: 'Point of Sale', href: '/point-of-sale', icon: ShoppingCart, role: 'admin' },
+  { name: 'Shift Management', href: '/shift-management', icon: Clock, role: 'admin' },
 ];
 
-const salesNavigation: NavItem[] = [
-  { name: 'Point of Sale', href: '/point-of-sale', role: 'user' },
-  { name: 'Web Orders', href: '/webOrders', role: 'user' },
-  // { name: 'eCommerce', href: '/eCommerce', role: 'user' },
+const reportsNavigation: NavItem[] = [
+  { name: 'Sales Summary', href: '/reports/summary', icon: BarChart3, role: 'user' },
+  { name: 'Sales Chart', href: '/reports/chart', icon: TrendingUp, role: 'user' },
+];
+
+const transactionsNavigation: NavItem[] = [
+  { name: 'Receipts', href: '/transactions', icon: Receipt, role: 'user' },
 ];
 
 const teamNavigation: NavItem[] = [
-  { name: 'Attendance', href: '/attendance', role: 'user' },
-  // { name: 'Presence', href: '/presence', role: 'admin' },
-  { name: 'Leaves', href: '/leaves', role: 'user' },
+  { name: 'Attendance', href: '/attendance', icon: CalendarCheck, role: 'user' },
+  { name: 'Leaves', href: '/leaves', icon: CalendarOff, role: 'user' },
 ];
 
 const superAdminNavigation: NavItem[] = [
-  { name: 'Permissions', href: '/permissions', role: 'super-admin' },
+  { name: 'Permissions', href: '/permissions', icon: Shield, role: 'super-admin' },
 ];
 
 function canAccess(
@@ -110,7 +129,11 @@ export default function AppSidebar() {
     canAccess(item.role, permissions),
   );
 
-  const accessibleSales = salesNavigation.filter((item) =>
+  const accessibleReports = reportsNavigation.filter((item) =>
+    canAccess(item.role, permissions),
+  );
+
+  const accessibleTransactions = transactionsNavigation.filter((item) =>
     canAccess(item.role, permissions),
   );
 
@@ -119,7 +142,8 @@ export default function AppSidebar() {
   );
 
   const collapsibleSections = [
-    { id: 'sales', title: 'Sales', items: accessibleSales },
+    { id: 'reports', title: 'Reports', items: accessibleReports },
+    { id: 'transactions', title: 'Transactions', items: accessibleTransactions },
     { id: 'team', title: 'Team', items: accessibleTeam },
     { id: 'management', title: 'Admin Management', items: accessibleManagement },
   ];
@@ -145,8 +169,9 @@ export default function AppSidebar() {
               <SidebarMenu>
                 {accessibleGeneral.map((item) => (
                   <SidebarMenuItem key={item.name}>
-                    <SidebarMenuButton asChild isActive={pathname === item.href}>
+                    <SidebarMenuButton asChild isActive={pathname === item.href} tooltip={item.name}>
                       <Link href={item.href}>
+                        <item.icon className="size-4" />
                         <span>{item.name}</span>
                       </Link>
                     </SidebarMenuButton>
@@ -177,8 +202,9 @@ export default function AppSidebar() {
                     <SidebarMenu>
                       {section.items.map((item) => (
                         <SidebarMenuItem key={item.name}>
-                          <SidebarMenuButton asChild isActive={pathname === item.href}>
+                          <SidebarMenuButton asChild isActive={pathname === item.href} tooltip={item.name}>
                             <Link href={item.href}>
+                              <item.icon className="size-4" />
                               <span>{item.name}</span>
                             </Link>
                           </SidebarMenuButton>
@@ -199,8 +225,9 @@ export default function AppSidebar() {
               <SidebarMenu>
                 {accessibleSuperAdmin.map((item) => (
                   <SidebarMenuItem key={item.name}>
-                    <SidebarMenuButton asChild isActive={pathname === item.href}>
+                    <SidebarMenuButton asChild isActive={pathname === item.href} tooltip={item.name}>
                       <Link href={item.href}>
+                        <item.icon className="size-4" />
                         <span>{item.name}</span>
                       </Link>
                     </SidebarMenuButton>
@@ -212,16 +239,26 @@ export default function AppSidebar() {
         )}
       </SidebarContent>
       <SidebarFooter>
-        <div className="p-2">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              tooltip={user?.name || 'User'}
+              className="flex items-center gap-2"
+            >
+              <div className="flex aspect-square size-4 items-center justify-center rounded-full bg-muted text-[10px] font-bold">
+                {user?.name?.charAt(0)?.toUpperCase() || 'U'}
+              </div>
+              <div className="flex flex-col group-data-[collapsible=icon]:hidden">
+                <span className="text-sm font-medium truncate">{user?.name}</span>
+                <span className="text-xs text-muted-foreground truncate">
+                  {user?.roles?.map((role) => role.name).join(', ') || 'User'}
+                </span>
+              </div>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+        <div className="group-data-[collapsible=icon]:hidden p-2">
           <TenantSwitcher />
-        </div>
-        <div className="flex items-center gap-2 p-2">
-          <div className="flex flex-col">
-            <span className="text-sm font-medium">{user?.name}</span>
-            <span className="text-xs text-muted-foreground">
-              {user?.roles?.map((role) => role.name).join(', ') || 'User'}
-            </span>
-          </div>
         </div>
       </SidebarFooter>
       <SidebarRail />

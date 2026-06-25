@@ -5,12 +5,11 @@ import {
   BundlePricingMode,
   Product,
   ProductInput,
-  ProductType,
-  ProductVariantInput,
-  ProductVariantGroup,
-  ProductVariantGroupInput,
   ProductModification,
   ProductModificationInput,
+  ProductVariantGroup,
+  ProductVariantGroupInput,
+  ProductType,
 } from '@/app/services/api';
 import apiService from '@/app/services/api';
 import { getErrorMessage } from '@/app/utils/error';
@@ -18,27 +17,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
 import { Checkbox } from '@/components/ui/Checkbox';
-import { VariantGroupModal } from './VariantGroupModal';
 import { FormField } from '@/components/ui/FormField';
 import { ImageUploader } from '@/components/ui/ImageUploader';
-import { compressImageFile } from '@/app/utils/imageCompression';
-
-type VariantGroupFormState = {
-  id?: string;
-  name: string;
-  isRequired: boolean;
-  variants: string[]; // Just array of variant names
-};
-
-type ModificationFormState = {
-  name: string;
-  price: string;
-  isActive: boolean;
-};
+import { useImageField } from '@/hooks/useImageField';
+import { SortableList } from '@/components/ui/SortableList';
 
 type StoreSelectionState = {
   selected: boolean;
   price: string;
+  stock: string;
 };
 
 type BundleItemFormState = {
@@ -46,14 +33,93 @@ type BundleItemFormState = {
   quantity: string;
 };
 
-type CombinationFormState = {
-  variantIds: string[];
+type VariantOptionFormState = {
   name: string;
   price: string;
   stock: string;
-  sku: string;
   isActive: boolean;
 };
+
+type VariantGroupFormState = {
+  name: string;
+  isRequired: boolean;
+  variants: VariantOptionFormState[];
+};
+
+type ModificationFormState = {
+  name: string;
+  price: string;
+  isActive: boolean;
+  linkedProductId: string;
+  linkedProductQuantity: string;
+};
+
+const defaultVariantOption = (): VariantOptionFormState => ({
+  name: '',
+  price: '',
+  stock: '',
+  isActive: true,
+});
+
+const defaultVariantGroup = (): VariantGroupFormState => ({
+  name: '',
+  isRequired: false,
+  variants: [defaultVariantOption()],
+});
+
+const mapVariantGroupToState = (group: ProductVariantGroup): VariantGroupFormState => ({
+  name: group.name,
+  isRequired: group.isRequired,
+  variants: group.variants.length > 0
+    ? group.variants.map((variant) => ({
+      name: variant.name,
+      price: variant.price != null ? variant.price.toString() : '',
+      stock: variant.stock != null ? variant.stock.toString() : '',
+      isActive: variant.isActive ?? true,
+    }))
+    : [defaultVariantOption()],
+});
+
+const toVariantGroupInput = (group: VariantGroupFormState): ProductVariantGroupInput => ({
+  name: group.name.trim(),
+  isRequired: group.isRequired,
+  variants: group.variants
+    .filter((variant) => variant.name.trim() !== '')
+    .map((variant) => ({
+      name: variant.name.trim(),
+      price: variant.price !== '' ? Number(variant.price) : undefined,
+      stock: variant.stock !== '' ? Number(variant.stock) : undefined,
+      isActive: variant.isActive,
+    })),
+});
+
+const defaultModification = (): ModificationFormState => ({
+  name: '',
+  price: '',
+  isActive: true,
+  linkedProductId: '',
+  linkedProductQuantity: '1',
+});
+
+const mapModificationToState = (modification: ProductModification): ModificationFormState => ({
+  name: modification.name,
+  price: modification.price != null ? modification.price.toString() : '',
+  isActive: modification.isActive ?? true,
+  linkedProductId: modification.linkedProductId ?? '',
+  linkedProductQuantity: modification.linkedProductQuantity != null
+    ? modification.linkedProductQuantity.toString()
+    : '1',
+});
+
+const toModificationInput = (modification: ModificationFormState): ProductModificationInput => ({
+  name: modification.name.trim(),
+  price: modification.price !== '' ? Number(modification.price) : undefined,
+  isActive: modification.isActive,
+  linkedProductId: modification.linkedProductId || null,
+  linkedProductQuantity: modification.linkedProductId
+    ? (modification.linkedProductQuantity !== '' ? Number(modification.linkedProductQuantity) : 1)
+    : null,
+});
 
 interface ProductFormProps {
   isOpen: boolean;
@@ -66,41 +132,6 @@ interface ProductFormProps {
   stores: { id: string; name: string; nickname?: string | null }[];
   storesLoading: boolean;
 }
-
-const defaultModification = (): ModificationFormState => ({
-  name: '',
-  price: '',
-  isActive: true,
-});
-
-const mapVariantGroupToState = (group: ProductVariantGroup): VariantGroupFormState => ({
-  id: group.id,
-  name: group.name,
-  isRequired: group.isRequired,
-  variants: group.variants.map(v => v.name), // Just extract names
-});
-
-const mapModificationToState = (modification: ProductModification): ModificationFormState => ({
-  name: modification.name,
-  price: modification.price != null ? modification.price.toString() : '',
-  isActive: modification.isActive ?? true,
-});
-
-const toVariantGroupInput = (state: VariantGroupFormState): ProductVariantGroupInput => ({
-  id: state.id,
-  name: state.name.trim(),
-  isRequired: state.isRequired,
-  variants: state.variants.map(name => ({
-    name: name.trim(),
-    // No sku/price/stock - backend will handle as nullable
-  })) as ProductVariantInput[],
-});
-
-const toModificationInput = (state: ModificationFormState): ProductModificationInput => ({
-  name: state.name.trim(),
-  price: state.price !== '' ? Number(state.price) : undefined,
-  isActive: state.isActive,
-});
 
 const ProductForm = ({
   isOpen,
@@ -115,28 +146,24 @@ const ProductForm = ({
 }: ProductFormProps) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [price, setPrice] = useState('');
   const [productType, setProductType] = useState<ProductType>('single');
   const [bundlePricingMode, setBundlePricingMode] = useState<BundlePricingMode>('fixed');
   const [bundleItems, setBundleItems] = useState<BundleItemFormState[]>([]);
-  const [sku, setSku] = useState('');
+  const [variantGroups, setVariantGroups] = useState<VariantGroupFormState[]>([]);
+  const [modifications, setModifications] = useState<ModificationFormState[]>([]);
   const [barcode, setBarcode] = useState('');
-  const [stock, setStock] = useState('');
   const [categoryId, setCategoryId] = useState<string>('');
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
-  const [request, setRequest] = useState(false);
   const [remaining, setRemaining] = useState(true);
   const [isActive, setIsActive] = useState(true);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [removeImage, setRemoveImage] = useState(false);
-  const [variantGroups, setVariantGroups] = useState<VariantGroupFormState[]>([]);
+  const productImage = useImageField({
+    currentImageUrl: product?.imageUrl,
+    hasExistingImage: !!product?.image,
+  });
+  const resetProductImage = productImage.reset;
   const [storeSelections, setStoreSelections] = useState<Record<string, StoreSelectionState>>({});
   const [storeSelectionsInitialized, setStoreSelectionsInitialized] = useState(false);
-  const [combinations, setCombinations] = useState<CombinationFormState[]>([]);
-  const [modifications, setModifications] = useState<ModificationFormState[]>([]);
   const [localError, setLocalError] = useState<string | null>(null);
-  const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
-  const [editingGroupIndex, setEditingGroupIndex] = useState<number | null>(null);
   const allStoresSelected = stores.length > 0 && stores.every((store) => storeSelections[store.id]?.selected);
   const bundleComponentOptions = useMemo(
     () => products
@@ -144,6 +171,7 @@ const ProductForm = ({
       .sort((a, b) => a.name.localeCompare(b.name, 'id', { sensitivity: 'base' })),
     [product?.id, products],
   );
+  const linkedModificationProductOptions = bundleComponentOptions;
   const bundleComponentTotal = useMemo(
     () => bundleItems.reduce((total, item) => {
       const component = bundleComponentOptions.find((candidate) => candidate.id === item.componentProductId);
@@ -168,8 +196,7 @@ const ProductForm = ({
   useEffect(() => {
     if (!isOpen) {
       setLocalError(null);
-      setImageFile(null);
-      setRemoveImage(false);
+      resetProductImage();
       setStoreSelections({});
       setStoreSelectionsInitialized(false);
       setCategoryId('');
@@ -179,46 +206,37 @@ const ProductForm = ({
     if (product) {
       setName(product.name);
       setDescription(product.description || '');
-      setPrice(product.price.toString());
       setProductType(product.type ?? 'single');
       setBundlePricingMode(product.bundlePricingMode ?? 'fixed');
       setBundleItems(product.bundleItems?.map((item) => ({
         componentProductId: item.componentProductId,
         quantity: item.quantity.toString(),
       })) ?? []);
-      setSku(product.sku);
+      setVariantGroups(product.variantGroups?.map(mapVariantGroupToState) ?? []);
+      setModifications(product.modifications?.map(mapModificationToState) ?? []);
       setBarcode(product.barcode || '');
-      setStock(product.stock.toString());
       setCategoryId(product.categoryDetail?.id || '');
-      setRequest(product.request);
       setRemaining(product.remaining);
       setIsActive(product.isActive);
-      setRemoveImage(false);
+      resetProductImage();
       // Image is displayed directly via imageUrl — no fetch needed
-
-      setVariantGroups(product.variantGroups?.map(mapVariantGroupToState) || []);
-      setModifications(product.modifications?.map(mapModificationToState) || []);
 
     } else {
       setName('');
       setDescription('');
-      setPrice('');
       setProductType('single');
       setBundlePricingMode('fixed');
       setBundleItems([]);
-      setSku('');
-      setBarcode('');
-      setStock('');
-      setRequest(false);
-      setRemaining(true);
-      setIsActive(true);
-      setRemoveImage(false);
       setVariantGroups([]);
       setModifications([]);
+      setBarcode('');
+      setRemaining(true);
+      setIsActive(true);
+      resetProductImage();
       setStoreSelections({});
       setStoreSelectionsInitialized(false);
     }
-  }, [isOpen, product]);
+  }, [isOpen, product, resetProductImage]);
 
   // ...
 
@@ -242,7 +260,7 @@ const ProductForm = ({
           if (existing) {
             next[store.id] = existing;
           } else {
-            next[store.id] = { selected: false, price: '' };
+            next[store.id] = { selected: false, price: '', stock: '' };
             changed = true;
           }
         });
@@ -263,135 +281,13 @@ const ProductForm = ({
       initial[store.id] = {
         selected: Boolean(existing),
         price: existing?.price != null ? existing.price.toString() : '',
+        stock: existing?.stock != null ? existing.stock.toString() : '',
       };
     });
 
     setStoreSelections(initial);
     setStoreSelectionsInitialized(true);
   }, [isOpen, product, stores, storeSelectionsInitialized]);
-
-  // Auto-generate combinations whenever variant groups change (Realtime like Shopee)
-  useEffect(() => {
-    const cartesianProduct = (arrays: string[][]): string[][] => {
-      if (arrays.length === 0) return [[]];
-      let result: string[][] = [[]];
-      for (const array of arrays) {
-        const temp: string[][] = [];
-        for (const resultItem of result) {
-          for (const value of array) {
-            temp.push([...resultItem, value]);
-          }
-        }
-        result = temp;
-      }
-      return result;
-    };
-
-    const groupsWithVariants = variantGroups.filter(
-      (group) => group.variants.length > 0 && group.variants.some((v) => v.trim() !== '')
-    );
-
-    if (groupsWithVariants.length === 0) {
-      setCombinations([]);
-      return;
-    }
-
-    const variantArrays = groupsWithVariants.map((group) =>
-      group.variants
-        .map((_, idx) => `${group.name}:${idx}`)
-        .filter((_, idx) => group.variants[idx].trim() !== '')
-    );
-
-    const combos = cartesianProduct(variantArrays);
-    const newCombinations: CombinationFormState[] = combos.map((combo) => {
-      const variantNames = combo.map((vKey) => {
-        const [groupName, vIdx] = vKey.split(':');
-        const group = groupsWithVariants.find((g) => g.name === groupName);
-        return (group?.variants[parseInt(vIdx)] || '').trim();
-      });
-
-      const name = variantNames.filter(Boolean).join(' × ');
-
-      // Try to find existing combination in current state to preserve user edits
-      const existing = combinations.find(c => c.name === name);
-
-      // Try to find existing combination in saved product data (fallback)
-      const saved = product?.variantCombinations?.find(c => c.name === name);
-
-      return {
-        variantIds: combo,
-        name,
-        price: existing?.price ?? (saved ? saved.price.toString() : (price || '0')),
-        stock: existing?.stock ?? (saved ? saved.stock.toString() : '0'),
-        sku: existing?.sku ?? saved?.sku ?? '',
-        isActive: existing?.isActive ?? saved?.isActive ?? true,
-      };
-    });
-
-    setCombinations(newCombinations);
-  }, [variantGroups, price]);
-
-  const handleVariantGroupChange = (
-    index: number,
-    key: keyof VariantGroupFormState,
-    value: string | boolean,
-  ) => {
-    setVariantGroups((prev) =>
-      prev.map((group, idx) =>
-        idx === index
-          ? { ...group, [key]: value }
-          : group,
-      ),
-    );
-  };
-
-  const handleAddGroup = () => {
-    setEditingGroupIndex(null);
-    setIsGroupModalOpen(true);
-  };
-
-  const handleEditGroup = (index: number) => {
-    setEditingGroupIndex(index);
-    setIsGroupModalOpen(true);
-  };
-
-  const handleSaveGroup = (name: string, variants: string[]) => {
-    if (editingGroupIndex !== null) {
-      // Update existing group
-      setVariantGroups(prev => prev.map((group, idx) =>
-        idx === editingGroupIndex
-          ? { ...group, name, variants }
-          : group
-      ));
-    } else {
-      // Add new group
-      setVariantGroups(prev => [...prev, {
-        name,
-        isRequired: true,
-        variants
-      }]);
-    }
-    setIsGroupModalOpen(false);
-    setEditingGroupIndex(null);
-  };
-
-  const handleRemoveGroup = (index: number) => {
-    setVariantGroups(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleModificationChange = (
-    index: number,
-    key: keyof ModificationFormState,
-    value: string | boolean,
-  ) => {
-    setModifications((prev) =>
-      prev.map((modification, idx) =>
-        idx === index
-          ? { ...modification, [key]: value }
-          : modification,
-      ),
-    );
-  };
 
   const handleBundleItemChange = (
     index: number,
@@ -407,23 +303,101 @@ const ProductForm = ({
     );
   };
 
-  const handleCombinationChange = (
-    index: number,
-    key: keyof CombinationFormState,
-    value: string | boolean | string[],
+  const handleVariantGroupChange = (
+    groupIndex: number,
+    key: keyof Omit<VariantGroupFormState, 'variants'>,
+    value: string | boolean,
   ) => {
-    setCombinations((prev) =>
-      prev.map((combination, idx) =>
-        idx === index
-          ? { ...combination, [key]: value }
-          : combination,
+    setVariantGroups((prev) =>
+      prev.map((group, idx) =>
+        idx === groupIndex
+          ? { ...group, [key]: value }
+          : group,
       ),
+    );
+  };
+
+  const handleVariantOptionChange = (
+    groupIndex: number,
+    variantIndex: number,
+    key: keyof VariantOptionFormState,
+    value: string | boolean,
+  ) => {
+    setVariantGroups((prev) =>
+      prev.map((group, idx) => {
+        if (idx !== groupIndex) {
+          return group;
+        }
+
+        return {
+          ...group,
+          variants: group.variants.map((variant, optionIdx) =>
+            optionIdx === variantIndex
+              ? { ...variant, [key]: value }
+              : variant,
+          ),
+        };
+      }),
+    );
+  };
+
+  const addVariantOption = (groupIndex: number) => {
+    setVariantGroups((prev) =>
+      prev.map((group, idx) =>
+        idx === groupIndex
+          ? { ...group, variants: [...group.variants, defaultVariantOption()] }
+          : group,
+      ),
+    );
+  };
+
+  const removeVariantOption = (groupIndex: number, variantIndex: number) => {
+    setVariantGroups((prev) =>
+      prev.map((group, idx) => {
+        if (idx !== groupIndex) {
+          return group;
+        }
+
+        return {
+          ...group,
+          variants: group.variants.filter((_, optionIdx) => optionIdx !== variantIndex),
+        };
+      }),
+    );
+  };
+
+  const handleModificationChange = (
+    index: number,
+    key: keyof ModificationFormState,
+    value: string | boolean,
+  ) => {
+    setModifications((prev) =>
+      prev.map((modification, idx) => {
+        if (idx !== index) {
+          return modification;
+        }
+
+        if (key === 'linkedProductId' && typeof value === 'string') {
+          const linkedProduct = linkedModificationProductOptions.find((candidate) => candidate.id === value);
+          return {
+            ...modification,
+            linkedProductId: value,
+            linkedProductQuantity: value ? (modification.linkedProductQuantity || '1') : modification.linkedProductQuantity,
+            name: linkedProduct ? linkedProduct.name : modification.name,
+          };
+        }
+
+        return {
+          ...modification,
+          [key]: value,
+        };
+      }),
     );
   };
 
   const toggleStore = (storeId: string) => {
     setStoreSelections((prev) => {
-      const current = prev[storeId] ?? { selected: false, price: '' };
+      const current = prev[storeId] ?? { selected: false, price: '', stock: '' };
       return {
         ...prev,
         [storeId]: {
@@ -440,7 +414,7 @@ const ProductForm = ({
       const next: Record<string, StoreSelectionState> = {};
 
       stores.forEach((store) => {
-        const current = prev[store.id] ?? { selected: false, price: '' };
+        const current = prev[store.id] ?? { selected: false, price: '', stock: '' };
         next[store.id] = {
           ...current,
           selected: shouldSelectAll,
@@ -454,11 +428,30 @@ const ProductForm = ({
   const handleStorePriceChange = (storeId: string, value: string) => {
     const cleaned = value.replace(/[^0-9]/g, '');
     setStoreSelections((prev) => {
+      const current = prev[storeId] ?? { selected: false, price: '', stock: '' };
+
       return {
         ...prev,
         [storeId]: {
+          ...current,
           selected: true,
           price: cleaned,
+        },
+      };
+    });
+  };
+
+  const handleStoreStockChange = (storeId: string, value: string) => {
+    const cleaned = value.replace(/[^0-9]/g, '');
+    setStoreSelections((prev) => {
+      const current = prev[storeId] ?? { selected: false, price: '', stock: '' };
+
+      return {
+        ...prev,
+        [storeId]: {
+          ...current,
+          selected: true,
+          stock: cleaned,
         },
       };
     });
@@ -470,23 +463,6 @@ const ProductForm = ({
 
     if (!name.trim()) {
       setLocalError('Product name is required.');
-      return;
-    }
-
-    // SKU is optional now (auto-generated)
-    // Image is optional now (initials fallback)
-
-    const priceValue = productType === 'bundle' && bundlePricingMode === 'sum_components'
-      ? bundleComponentTotal
-      : (price !== '' ? Number(price) : 0);
-    if (!Number.isFinite(priceValue) || priceValue < 0) {
-      setLocalError('Price must be a valid non-negative number.');
-      return;
-    }
-
-    const stockValue = stock !== '' ? Number(stock) : 0;
-    if (!Number.isFinite(stockValue) || stockValue < 0) {
-      setLocalError('Stock must be a valid non-negative number.');
       return;
     }
 
@@ -516,40 +492,87 @@ const ProductForm = ({
       }
     }
 
-    const payload: ProductInput = {
-      name: name.trim(),
-      description: description.trim() || null,
-      type: productType,
-      bundle_pricing_mode: productType === 'bundle' ? bundlePricingMode : 'fixed',
-      price: priceValue,
-      sku: sku.trim(),
-      barcode: barcode.trim() || null,
-      stock: stockValue,
-      request,
-      remaining,
-      is_active: isActive,
-      imageFile,
-      remove_image: removeImage, // Add this flag
-      category_id: categoryId || undefined, // Add category assignment
+    const preparedVariantGroups = variantGroups
+      .map((group) => ({
+        ...group,
+        name: group.name.trim(),
+        variants: group.variants
+          .map((variant) => ({
+            ...variant,
+            name: variant.name.trim(),
+          }))
+          .filter((variant) => variant.name !== ''),
+      }))
+      .filter((group) => group.name !== '' || group.variants.length > 0);
 
-      variant_groups: variantGroups.map(toVariantGroupInput),
-      variants: combinations.map(c => ({
-        name: c.name,
-        price: Number(c.price),
-        stock: Number(c.stock),
-        sku: c.sku,
-        isActive: c.isActive
-      })),
-      modifications: modifications.map(toModificationInput),
-      bundle_items: productType === 'bundle' ? bundlePayload : [],
-    };
+    const invalidVariantGroup = preparedVariantGroups.some(
+      (group) => group.name === '' || group.variants.length === 0,
+    );
+
+    if (invalidVariantGroup) {
+      setLocalError('Each variant group must have a name and at least one variant.');
+      return;
+    }
+
+    const invalidVariantValue = preparedVariantGroups.some((group) =>
+      group.variants.some((variant) => {
+        const price = variant.price !== '' ? Number(variant.price) : 0;
+        const stock = variant.stock !== '' ? Number(variant.stock) : 0;
+
+        return !Number.isFinite(price)
+          || price < 0
+          || !Number.isInteger(stock)
+          || stock < 0;
+      }),
+    );
+
+    if (invalidVariantValue) {
+      setLocalError('Variant price and stock must be valid non-negative numbers.');
+      return;
+    }
+
+    const preparedModifications = modifications
+      .map((modification) => {
+        const linkedProduct = linkedModificationProductOptions.find(
+          (candidate) => candidate.id === modification.linkedProductId,
+        );
+
+        return {
+          ...modification,
+          name: modification.name.trim() || linkedProduct?.name || '',
+        };
+      })
+      .filter((modification) => modification.name.trim() !== '' || modification.linkedProductId);
+
+    const invalidModificationLink = preparedModifications.some((modification) => {
+      if (!modification.linkedProductId) {
+        return false;
+      }
+
+      const quantity = modification.linkedProductQuantity !== ''
+        ? Number(modification.linkedProductQuantity)
+        : 0;
+
+      return !Number.isInteger(quantity) || quantity < 1;
+    });
+
+    if (invalidModificationLink) {
+      setLocalError('Linked product quantity in modifications must be at least 1.');
+      return;
+    }
 
     const selectedStores = Object.entries(storeSelections)
       .filter(([, state]) => state.selected)
       .map(([id, state]) => ({
         id,
         price: state.price !== '' ? Number(state.price) : undefined,
+        stock: state.stock !== '' ? Number(state.stock) : undefined,
       }));
+
+    if (selectedStores.length === 0) {
+      setLocalError('Select at least one store.');
+      return;
+    }
 
     const invalidStorePrice = selectedStores.some(
       (store) => store.price !== undefined && (!Number.isFinite(store.price) || store.price < 0),
@@ -559,6 +582,49 @@ const ProductForm = ({
       setLocalError('Store prices must be valid non-negative numbers.');
       return;
     }
+
+    const invalidStoreStock = selectedStores.some(
+      (store) => store.stock !== undefined && (!Number.isInteger(store.stock) || store.stock < 0),
+    );
+
+    if (invalidStoreStock) {
+      setLocalError('Store stock must be a valid non-negative whole number.');
+      return;
+    }
+
+    const firstStoreWithPrice = selectedStores.find((store) => store.price !== undefined);
+    const firstStoreWithStock = selectedStores.find((store) => store.stock !== undefined);
+    const fallbackPrice = productType === 'bundle' && bundlePricingMode === 'sum_components'
+      ? bundleComponentTotal
+      : (firstStoreWithPrice?.price ?? product?.price ?? 0);
+    const fallbackStock = firstStoreWithStock?.stock ?? product?.stock ?? 0;
+
+    const payload: ProductInput = {
+      name: name.trim(),
+      description: description.trim() || null,
+      type: productType,
+      bundle_pricing_mode: productType === 'bundle' ? bundlePricingMode : 'fixed',
+      price: fallbackPrice,
+      sku: '',
+      barcode: barcode.trim() || null,
+      stock: fallbackStock,
+      request: false,
+      remaining,
+      is_active: isActive,
+      imageFile: productImage.file,
+      remove_image: productImage.shouldRemove,
+      category_id: categoryId || undefined, // Add category assignment
+      variants: product?.variantCombinations?.map((combination) => ({
+        name: combination.name,
+        sku: combination.sku ?? undefined,
+        price: combination.price,
+        stock: combination.stock,
+        isActive: combination.isActive,
+      })) ?? [],
+      variant_groups: preparedVariantGroups.map(toVariantGroupInput),
+      bundle_items: productType === 'bundle' ? bundlePayload : [],
+      modifications: preparedModifications.map(toModificationInput),
+    };
 
     payload.stores = selectedStores;
     payload.store_ids = selectedStores.map((store) => store.id);
@@ -577,7 +643,7 @@ const ProductForm = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-8">
-      <div className="relative flex w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+      <div className="relative flex max-h-[88vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">
@@ -585,7 +651,7 @@ const ProductForm = ({
             </h2>
             <p className="text-xs text-gray-600">
               {product
-                ? 'Update product details, variants, and modifications.'
+                ? 'Update product details and store availability.'
                 : 'Add a new product to the catalogue.'}
             </p>
           </div>
@@ -638,37 +704,14 @@ const ProductForm = ({
                     </FormField>
                   ) : null}
                 </div>
-                <FormField label="SKU">
-                  <Input
-                    value={sku}
-                    onChange={(e) => setSku(e.target.value)}
-                    placeholder="Auto-generated if empty (e.g. GA-AY-1234)"
-                  />
-                  <p className="mt-1 text-xs text-gray-500">
-                    Leave empty to auto-generate: &#123;TENANT&#125;-&#123;PRODUCT&#125;-&#123;RANDOM&#125;
-                  </p>
+                <FormField label="Barcode">
+                  <Input value={barcode} onChange={(e) => setBarcode(e.target.value)} placeholder="Optional barcode" />
                 </FormField>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <FormField label="Price (Rp)" required>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="100"
-                      value={productType === 'bundle' && bundlePricingMode === 'sum_components' ? String(bundleComponentTotal) : price}
-                      onChange={(e) => setPrice(e.target.value)}
-                      disabled={productType === 'bundle' && bundlePricingMode === 'sum_components'}
-                      placeholder="0"
-                    />
-                  </FormField>
-                  <FormField label="Barcode">
-                    <Input value={barcode} onChange={(e) => setBarcode(e.target.value)} placeholder="Optional barcode" />
-                  </FormField>
-                </div>
                 <FormField label="Description">
                   <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="Describe the product..." />
                 </FormField>
 
-                <FormField label="Category">
+                <FormField label="Category" className="space-y-3">
                   <select
                     value={categoryId}
                     onChange={(e) => setCategoryId(e.target.value)}
@@ -758,25 +801,8 @@ const ProductForm = ({
 
               </div>
               <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <FormField label="Stock">
-                      <Input type="number" min="0" value={stock} onChange={(e) => setStock(e.target.value)} placeholder="0" />
-                    </FormField>
-                  </div>
-                </div>
                 <div className="col-span-1 sm:col-span-2">
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <div className="flex items-center space-x-2 rounded-md border border-gray-200 px-3 py-2 hover:bg-gray-50">
-                      <Checkbox
-                        id="product-request-toggle"
-                        checked={request}
-                        onCheckedChange={(checked) => setRequest(checked === true)}
-                      />
-                      <label htmlFor="product-request-toggle" className="cursor-pointer text-xs font-medium text-gray-700">
-                        Request Only
-                      </label>
-                    </div>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="flex items-center space-x-2 rounded-md border border-gray-200 px-3 py-2 hover:bg-gray-50">
                       <Checkbox
                         id="product-remaining-toggle"
@@ -801,200 +827,171 @@ const ProductForm = ({
                 </div>
                 <FormField label="Product Image">
                   <div className="mt-1">
-                    <ImageUploader
-                      currentImageUrl={product?.imageUrl}
-                      hasExistingImage={!!product?.image}
-                      onFileSelect={async (file) => {
-                        if (file) {
-                          try {
-                            const compressedFile = await compressImageFile(file);
-                            setImageFile(compressedFile);
-                            setRemoveImage(false);
-                            setLocalError(null);
-                          } catch (error) {
-                            console.error('Failed to compress product image:', error);
-                            setLocalError('Gagal memproses gambar. Coba gunakan file gambar lain.');
-                            setImageFile(null);
-                          }
-                        } else {
-                          setImageFile(null);
-                        }
-                      }}
-                      onRemove={() => {
-                        if (product?.image) {
-                          setRemoveImage(true);
-                        }
-                      }}
-                    />
+                    <ImageUploader {...productImage.uploaderProps} />
                   </div>
                   <p className="mt-1 text-xs text-gray-500">
-                    Optional. Gambar akan dikonversi ke WebP dan dibatasi maksimal 1200x1200 px sebelum upload.
+                    Optional. Gambar akan di-crop 1:1 dan dikonversi ke WebP (maks. 1200×1200 px).
                   </p>
                 </FormField>
               </div>
             </div>
 
             <section className="space-y-3 rounded-xl border border-gray-200 p-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-gray-900">Variant Groups</h3>
-              </div>
-
-              <div className="space-y-4">
-                {variantGroups.map((group, index) => (
-                  <div key={index} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <h4 className="text-sm font-semibold text-gray-900">{group.name}</h4>
-                        <label className="inline-flex items-center space-x-2 text-xs text-gray-600">
-                          <input
-                            type="checkbox"
-                            checked={group.isRequired}
-                            onChange={(e) => handleVariantGroupChange(index, 'isRequired', e.target.checked)}
-                            className="h-3 w-3 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
-                          />
-                          <span>Required Selection</span>
-                        </label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEditGroup(index)}
-                          className="text-gray-700 hover:bg-gray-100"
-                        >
-                          Edit Options
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveGroup(index)}
-                          className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                        >
-                          Remove
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                      {group.variants.map((variantName, vIdx) => (
-                        <span
-                          key={vIdx}
-                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
-                        >
-                          {variantName}
-                        </span>
-                      ))}
-                      {group.variants.length === 0 && (
-                        <span className="text-xs text-gray-400 italic">No options added</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">Variants</h3>
+                  <p className="text-xs text-gray-600">
+                    Group product options such as size, spice level, or serving choice.
+                  </p>
+                </div>
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={handleAddGroup}
-                  className="w-full border-dashed border-2 border-gray-300 text-gray-700 hover:border-gray-500 py-3"
+                  size="sm"
+                  onClick={() => setVariantGroups((prev) => [...prev, defaultVariantGroup()])}
                 >
-                  + Add Variant Group
+                  Add Group
                 </Button>
               </div>
+              {variantGroups.length === 0 ? (
+                <div className="rounded-md border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-600">
+                  No variants defined.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-xs text-gray-500">Tip: drag the handle (⋮) to reorder groups and options.</p>
+                  <SortableList
+                    items={variantGroups}
+                    getId={(_, index) => `variant-group-${index}`}
+                    onReorder={(reordered) => setVariantGroups(reordered)}
+                    renderItem={(group, groupIndex) => (
+                      <div className="space-y-3 rounded-md border border-gray-200 bg-white p-3">
+                        <div className="grid gap-2 lg:grid-cols-[minmax(220px,1fr)_150px_96px]">
+                          <Input
+                            value={group.name}
+                            onChange={(e) => handleVariantGroupChange(groupIndex, 'name', e.target.value)}
+                            placeholder="Group name, e.g. Size"
+                            className="h-9"
+                          />
+                          <label className="flex h-9 items-center gap-2 rounded-md border border-gray-200 px-3 text-xs font-medium text-gray-700">
+                            <Checkbox
+                              checked={group.isRequired}
+                              onCheckedChange={(checked) => handleVariantGroupChange(groupIndex, 'isRequired', checked === true)}
+                            />
+                            <span>Required</span>
+                          </label>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-9 text-red-500 hover:text-red-600"
+                            onClick={() => setVariantGroups((prev) => prev.filter((_, idx) => idx !== groupIndex))}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="hidden grid-cols-[minmax(180px,1fr)_120px_120px_96px_80px] gap-2 px-2 text-xs font-semibold uppercase tracking-wide text-gray-500 lg:grid">
+                            <span>Option</span>
+                            <span>Price</span>
+                            <span>Stock</span>
+                            <span>Status</span>
+                            <span>Action</span>
+                          </div>
+                          {group.variants.length > 0 ? (
+                            <SortableList
+                              items={group.variants}
+                              getId={(_, vIndex) => `variant-${groupIndex}-${vIndex}`}
+                              onReorder={(reordered) =>
+                                setVariantGroups((prev) =>
+                                  prev.map((g, idx) =>
+                                    idx === groupIndex ? { ...g, variants: reordered } : g,
+                                  ),
+                                )
+                              }
+                              renderItem={(variant, variantIndex) => (
+                                <div className="grid gap-2 rounded-md border border-gray-100 bg-gray-50 p-2 lg:grid-cols-[minmax(180px,1fr)_120px_120px_96px_80px]">
+                                  <div className="space-y-1 lg:space-y-0">
+                                    <span className="text-sm font-medium text-gray-700 lg:hidden">Option</span>
+                                    <Input
+                                      value={variant.name}
+                                      onChange={(e) => handleVariantOptionChange(groupIndex, variantIndex, 'name', e.target.value)}
+                                      placeholder="Option name"
+                                      className="h-9 bg-white"
+                                    />
+                                  </div>
+                                  <div className="space-y-1 lg:space-y-0">
+                                    <span className="text-sm font-medium text-gray-700 lg:hidden">Price</span>
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      value={variant.price}
+                                      onChange={(e) => handleVariantOptionChange(groupIndex, variantIndex, 'price', e.target.value)}
+                                      placeholder="0"
+                                      className="h-9 bg-white"
+                                    />
+                                  </div>
+                                  <div className="space-y-1 lg:space-y-0">
+                                    <span className="text-sm font-medium text-gray-700 lg:hidden">Stock</span>
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      value={variant.stock}
+                                      onChange={(e) => handleVariantOptionChange(groupIndex, variantIndex, 'stock', e.target.value)}
+                                      placeholder="0"
+                                      className="h-9 bg-white"
+                                    />
+                                  </div>
+                                  <div className="space-y-1 lg:space-y-0">
+                                    <span className="text-sm font-medium text-gray-700 lg:hidden">Status</span>
+                                    <label className="flex h-9 items-center gap-2 rounded-md border border-gray-200 bg-white px-2 text-xs font-medium text-gray-700">
+                                      <Checkbox
+                                        checked={variant.isActive}
+                                        onCheckedChange={(checked) => handleVariantOptionChange(groupIndex, variantIndex, 'isActive', checked === true)}
+                                      />
+                                      <span>Active</span>
+                                    </label>
+                                  </div>
+                                  <div className="space-y-1 lg:space-y-0">
+                                    <span className="text-sm font-medium text-gray-700 lg:hidden">Action</span>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-9 w-full text-red-500 hover:text-red-600"
+                                      onClick={() => removeVariantOption(groupIndex, variantIndex)}
+                                    >
+                                      Remove
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+                            />
+                          ) : null}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => addVariantOption(groupIndex)}
+                        >
+                          Add Option
+                        </Button>
+                      </div>
+                    )}
+                  />
+                </div>
+              )}
             </section>
 
-            {/* Variant Group Modal */}
-            <VariantGroupModal
-              isOpen={isGroupModalOpen}
-              group={editingGroupIndex !== null ? {
-                name: variantGroups[editingGroupIndex].name,
-                variants: variantGroups[editingGroupIndex].variants
-              } : null}
-              onSave={handleSaveGroup}
-              onClose={() => {
-                setIsGroupModalOpen(false);
-                setEditingGroupIndex(null);
-              }}
-            />
-
-            {/* Realtime Variant Combinations Table (Shopee Style) */}
-            {combinations.length > 0 && (
-              <section className="space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-4">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-900">Daftar Variasi</h3>
-                    <p className="text-xs text-gray-600 mt-1">
-                      {combinations.length} kombinasi • Edit langsung price & stock untuk setiap kombinasi
-                    </p>
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto bg-white rounded-lg border border-gray-300">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-100">
-                      <tr>
-                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Variasi</th>
-                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 w-32">Harga (Rp)</th>
-                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 w-24">Stok</th>
-                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 w-32">SKU</th>
-                        <th className="px-4 py-2 text-center text-xs font-semibold text-gray-700 w-20">Active</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {combinations.map((combo, index) => (
-                        <tr key={index} className="hover:bg-gray-50">
-                          <td className="px-4 py-2 text-sm text-gray-900">{combo.name}</td>
-                          <td className="px-4 py-2">
-                            <Input
-                              type="number"
-                              min="0"
-                              value={combo.price}
-                              onChange={(e) => handleCombinationChange(index, 'price', e.target.value)}
-                              className="text-sm"
-                            />
-                          </td>
-                          <td className="px-4 py-2">
-                            <Input
-                              type="number"
-                              min="0"
-                              value={combo.stock}
-                              onChange={(e) => handleCombinationChange(index, 'stock', e.target.value)}
-                              className="text-sm"
-                            />
-                          </td>
-                          <td className="px-4 py-2">
-                            <Input
-                              type="text"
-                              value={combo.sku}
-                              onChange={(e) => handleCombinationChange(index, 'sku', e.target.value)}
-                              placeholder="Optional"
-                              className="text-sm"
-                            />
-                          </td>
-                          <td className="px-4 py-2 text-center">
-                            <input
-                              type="checkbox"
-                              checked={combo.isActive}
-                              onChange={(e) => handleCombinationChange(index, 'isActive', e.target.checked)}
-                              className="h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                <p className="text-xs text-gray-600 italic">
-                  Combinations auto-update saat Anda ubah variant groups.
-                </p>
-              </section>
-            )}
-
             <section className="space-y-3 rounded-xl border border-gray-200 p-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-gray-900">Modifications</h3>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">Modifications</h3>
+                  <p className="text-xs text-gray-600">
+                    Link an option to a stock product when it consumes inventory.
+                  </p>
+                </div>
                 <Button
                   type="button"
                   variant="outline"
@@ -1005,13 +1002,28 @@ const ProductForm = ({
                 </Button>
               </div>
               {modifications.length === 0 ? (
-                <p className="text-sm text-gray-600">No modifications defined.</p>
+                <div className="rounded-md border border-dashed border-gray-200 px-3 py-4 text-sm text-gray-600">
+                  No modifications defined.
+                </div>
               ) : (
                 <div className="space-y-2">
-                  {modifications.map((modification, index) => (
-                    <div key={`modification-${index}`} className="rounded-md border border-gray-200 bg-white p-2">
-                      <div className="grid items-center gap-2 md:grid-cols-[minmax(0,1fr)_160px_96px_80px]">
-                        <div className="min-w-0">
+                  <div className="hidden grid-cols-[minmax(180px,1fr)_120px_minmax(220px,1.1fr)_96px_96px_80px] gap-2 px-2 text-xs font-semibold uppercase tracking-wide text-gray-500 lg:grid">
+                    <span>Name</span>
+                    <span>Price</span>
+                    <span>Linked Stock</span>
+                    <span>Qty</span>
+                    <span>Status</span>
+                    <span>Action</span>
+                  </div>
+                  <p className="text-xs text-gray-500">Tip: drag the handle (⋮) to reorder modifications.</p>
+                  <SortableList
+                    items={modifications}
+                    getId={(_, index) => `modification-${index}`}
+                    onReorder={(reordered) => setModifications(reordered)}
+                    renderItem={(modification, index) => (
+                      <div className="grid gap-2 rounded-md border border-gray-200 bg-white p-3 lg:grid-cols-[minmax(180px,1fr)_120px_minmax(220px,1.1fr)_96px_96px_80px]">
+                        <div className="space-y-1 lg:space-y-0">
+                          <span className="text-sm font-medium text-gray-700 lg:hidden">Name</span>
                           <Input
                             value={modification.name}
                             onChange={(e) => handleModificationChange(index, 'name', e.target.value)}
@@ -1019,35 +1031,74 @@ const ProductForm = ({
                             className="h-9"
                           />
                         </div>
-                        <Input
-                          type="number"
-                          min="0"
-                          value={modification.price}
-                          onChange={(e) => handleModificationChange(index, 'price', e.target.value)}
-                          placeholder="Additional price"
-                          className="h-9"
-                        />
-                        <label className="inline-flex h-9 items-center space-x-2 rounded-md border border-gray-100 px-2 text-xs text-gray-600">
-                          <Checkbox
-                            checked={modification.isActive}
-                            onCheckedChange={(checked) =>
-                              handleModificationChange(index, 'isActive', checked === true)
-                            }
+                        <div className="space-y-1 lg:space-y-0">
+                          <span className="text-sm font-medium text-gray-700 lg:hidden">Price</span>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={modification.price}
+                            onChange={(e) => handleModificationChange(index, 'price', e.target.value)}
+                            placeholder="0"
+                            className="h-9"
                           />
-                          <span>Active</span>
-                        </label>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-9 text-red-500 hover:text-red-600"
-                          onClick={() => setModifications((prev) => prev.filter((_, idx) => idx !== index))}
-                        >
-                          Remove
-                        </Button>
+                        </div>
+                        <div className="space-y-1 lg:space-y-0">
+                          <span className="text-sm font-medium text-gray-700 lg:hidden">Linked Stock</span>
+                          <select
+                            value={modification.linkedProductId}
+                            onChange={(e) => handleModificationChange(index, 'linkedProductId', e.target.value)}
+                            className="h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="">No linked stock</option>
+                            {linkedModificationProductOptions.map((candidate) => (
+                              <option key={candidate.id} value={candidate.id}>
+                                {candidate.name} - stock {candidate.stock}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="space-y-1 lg:space-y-0">
+                          <span className="text-sm font-medium text-gray-700 lg:hidden">Qty</span>
+                          <Input
+                            type="number"
+                            min="1"
+                            value={modification.linkedProductQuantity}
+                            onChange={(e) => handleModificationChange(index, 'linkedProductQuantity', e.target.value)}
+                            placeholder="1"
+                            className="h-9"
+                            disabled={!modification.linkedProductId}
+                          />
+                        </div>
+                        <div className="space-y-1 lg:space-y-0">
+                          <span className="text-sm font-medium text-gray-700 lg:hidden">Status</span>
+                          <label className="flex h-9 items-center gap-2 rounded-md border border-gray-200 px-2 text-xs font-medium text-gray-700">
+                            <Checkbox
+                              checked={modification.isActive}
+                              onCheckedChange={(checked) => handleModificationChange(index, 'isActive', checked === true)}
+                            />
+                            <span>Active</span>
+                          </label>
+                        </div>
+                        <div className="space-y-1 lg:space-y-0">
+                          <span className="text-sm font-medium text-gray-700 lg:hidden">Action</span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-9 w-full text-red-500 hover:text-red-600"
+                            onClick={() => setModifications((prev) => prev.filter((_, idx) => idx !== index))}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                        {modification.linkedProductId ? (
+                          <p className="text-xs text-gray-500 lg:col-span-6">
+                            Stock will be deducted from the linked product when this modification is ordered.
+                          </p>
+                        ) : null}
                       </div>
-                    </div>
-                  ))}
+                    )}
+                  />
                 </div>
               )}
             </section>
@@ -1073,9 +1124,14 @@ const ProductForm = ({
               ) : (
                 <div className="grid max-h-56 grid-cols-1 gap-2 overflow-y-auto border border-gray-100 p-3 sm:grid-cols-2">
                   {stores.map((store) => {
-                    const selection = storeSelections[store.id] ?? { selected: false, price: '' };
+                    const selection = storeSelections[store.id] ?? { selected: false, price: '', stock: '' };
                     return (
-                      <div key={store.id} className="flex items-center justify-between space-x-2 rounded-md border border-gray-100 p-2 hover:bg-gray-50">
+                      <div
+                        key={store.id}
+                        className={`grid items-center gap-2 rounded-md border border-gray-100 p-2 hover:bg-gray-50 ${
+                          selection.selected ? 'sm:grid-cols-[minmax(0,1fr)_140px_120px]' : 'sm:grid-cols-1'
+                        }`}
+                      >
                         <label className="flex flex-1 items-center space-x-2 text-sm text-gray-700 cursor-pointer">
                           <Checkbox
                             checked={selection.selected}
@@ -1083,18 +1139,29 @@ const ProductForm = ({
                           />
                           <span className="truncate" title={store.name}>{store.nickname || store.name}</span>
                         </label>
-                        <div className="flex items-center space-x-1">
-                          <span className="text-xs text-gray-600">Rp</span>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={selection.price}
-                            onChange={(e) => handleStorePriceChange(store.id, e.target.value)}
-                            disabled={!selection.selected}
-                            className="w-28 px-2 py-1"
-                            placeholder="0"
-                          />
-                        </div>
+                        {selection.selected ? (
+                          <>
+                            <div className="flex items-center space-x-1">
+                              <span className="text-xs text-gray-600">Rp</span>
+                              <Input
+                                type="number"
+                                min="0"
+                                value={selection.price}
+                                onChange={(e) => handleStorePriceChange(store.id, e.target.value)}
+                                className="w-28 px-2 py-1"
+                                placeholder="0"
+                              />
+                            </div>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={selection.stock}
+                              onChange={(e) => handleStoreStockChange(store.id, e.target.value)}
+                              className="px-2 py-1"
+                              placeholder="Stock"
+                            />
+                          </>
+                        ) : null}
                       </div>
                     );
                   })}
