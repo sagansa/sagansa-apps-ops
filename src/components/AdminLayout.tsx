@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import AppSidebar from './Sidebar';
 import Header from './Header';
+import BillingBanner from './BillingBanner';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 
 export default function AdminLayout({
@@ -45,7 +46,10 @@ export default function AdminLayout({
           </div>
         </header>
         <main className="flex-1 overflow-y-auto bg-slate-50 p-4">
-          <div className="mx-auto w-full max-w-6xl">{children}</div>
+          <div className="mx-auto w-full max-w-6xl space-y-4">
+            <BillingBanner />
+            {children}
+          </div>
         </main>
       </SidebarInset>
     </SidebarProvider>

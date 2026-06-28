@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/app/contexts/AuthContext';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import AdminLayout from '@/components/AdminLayout';
+import BillingGate from '@/components/BillingGate';
 import apiService, { Leave, LeaveStatus } from '@/app/services/api';
 import LeaveList from './LeaveList';
 import { useTranslations } from 'next-intl';
@@ -124,7 +125,9 @@ export default function LeavePage() {
   return (
     <ProtectedRoute>
       <AdminLayout>
-        <LeaveContent />
+        <BillingGate>
+          <LeaveContent />
+        </BillingGate>
       </AdminLayout>
     </ProtectedRoute>
   );

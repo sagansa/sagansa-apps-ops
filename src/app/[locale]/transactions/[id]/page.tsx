@@ -3,6 +3,7 @@
 import { use } from 'react';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import AdminLayout from '@/components/AdminLayout';
+import BillingGate from '@/components/BillingGate';
 import { StoreProvider } from '@/app/contexts/StoreContext';
 import TransactionDetailClient from './TransactionDetailClient';
 
@@ -12,7 +13,9 @@ export default function TransactionDetailPage({ params }: { params: Promise<{ id
     <ProtectedRoute requiredRole="admin">
       <StoreProvider>
         <AdminLayout>
-          <TransactionDetailClient orderId={id} />
+          <BillingGate>
+            <TransactionDetailClient orderId={id} />
+          </BillingGate>
         </AdminLayout>
       </StoreProvider>
     </ProtectedRoute>

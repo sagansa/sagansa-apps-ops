@@ -10,6 +10,7 @@ import AttendanceList from './AttendanceList';
 import AttendanceFilters from './AttendanceFilters';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import AdminLayout from '@/components/AdminLayout';
+import BillingGate from '@/components/BillingGate';
 import { useTranslations } from 'next-intl';
 
 function AttendanceContent() {
@@ -170,7 +171,9 @@ export default function AttendancePage() {
       <TenantProvider>
         <StoreProvider>
           <ShiftStoreProvider>
-            <AttendanceContent />
+            <BillingGate>
+              <AttendanceContent />
+            </BillingGate>
           </ShiftStoreProvider>
         </StoreProvider>
       </TenantProvider>

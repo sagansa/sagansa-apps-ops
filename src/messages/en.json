@@ -67,6 +67,9 @@
     "transactions": "Transactions",
     "receipts": "Receipts",
     "team": "Team",
+    "billing": "Billing",
+    "billingNav": "Billing",
+    "billingConfigNav": "Billing Config",
     "attendance": "Attendance",
     "leaves": "Leaves",
     "superAdmin": "Super Admin",
@@ -333,6 +336,113 @@
     "empty": "No leave requests found",
     "emptyFiltered": "No leave requests match your search criteria.",
     "emptyNew": "Create a new leave request to get started."
+  },
+  "Billing": {
+    "nav": "Billing",
+    "navConfig": "Billing Config",
+    "title": "Billing & Subscription",
+    "subtitle": "Manage your subscription, invoices, and payments.",
+    "status": {
+      "trialing": "Trial",
+      "active": "Active",
+      "suspended": "Suspended",
+      "cancelled": "Cancelled",
+      "exempt": "Exempt"
+    },
+    "trialEndsIn": "Trial ends in {days} days",
+    "trialEnded": "Your trial has ended",
+    "currentInvoice": "Current Invoice",
+    "dueDate": "Due: {date}",
+    "overdue": "Overdue",
+    "paid": "Paid",
+    "payNow": "Pay Now",
+    "noActiveInvoice": "No active invoice",
+    "estimate": "Current Month Estimate",
+    "estimateHint": "Real-time estimate based on current month usage. Final invoice is generated on the 5th.",
+    "posCharge": "POS Charge",
+    "attendanceCharge": "Attendance Charge",
+    "discount": "Discount",
+    "total": "Total",
+    "breakdown": {
+      "title": "Breakdown",
+      "store": "Store",
+      "revenue": "Revenue",
+      "charge": "Charge",
+      "employees": "{count} active employees"
+    },
+    "history": "Invoice History",
+    "period": "Period",
+    "amount": "Amount",
+    "method": "Method",
+    "paidAt": "Paid At",
+    "noHistory": "No invoices yet",
+    "banner": {
+      "trialSoon": "Your trial ends in {days} days. Subscribe to keep all features.",
+      "overdue": "Your invoice of {amount} is overdue since {date}. Pay now to restore access.",
+      "suspended": "Your account is suspended. Pay the outstanding invoice to restore access to history & reports.",
+      "exempt": "This tenant is exempt from billing."
+    },
+    "gate": {
+      "locked": "Locked",
+      "lockedTitle": "Access Locked",
+      "lockedDesc": "Pay your outstanding invoice to view transaction history and reports.",
+      "payToUnlock": "Pay to Unlock"
+    },
+    "config": {
+      "title": "Billing Configuration",
+      "tabProvider": "Payment Provider",
+      "tabPricing": "Pricing",
+      "tabDiscounts": "Discounts",
+      "tabTenants": "Tenants",
+      "provider": {
+        "active": "Active Provider",
+        "xendit": "Xendit",
+        "midtrans": "Midtrans",
+        "xenditSecret": "Xendit Secret Key",
+        "xenditVerify": "Xendit Verify Key",
+        "midtransServer": "Midtrans Server Key",
+        "midtransClient": "Midtrans Client Key",
+        "midtransProduction": "Midtrans Production Mode",
+        "webhookSecret": "Webhook Secret",
+        "save": "Save Settings",
+        "saved": "Settings saved successfully."
+      },
+      "pricing": {
+        "posRate": "POS Rate (%)",
+        "posBase": "POS Max Charge per Store",
+        "attendanceRate": "Attendance Rate per Employee",
+        "attendanceFree": "Attendance Free Employees",
+        "trialMonths": "Trial Months",
+        "save": "Save Pricing",
+        "saved": "Pricing updated successfully."
+      },
+      "discount": {
+        "add": "Add Discount",
+        "edit": "Edit Discount",
+        "code": "Code",
+        "name": "Name",
+        "type": "Type",
+        "percentage": "Percentage",
+        "fixed": "Fixed Amount",
+        "value": "Value",
+        "appliesTo": "Applies To",
+        "startsAt": "Start Date",
+        "endsAt": "End Date (optional)",
+        "active": "Active",
+        "save": "Save",
+        "delete": "Delete",
+        "noDiscounts": "No discounts configured."
+      },
+      "tenant": {
+        "exempt": "Exempt from billing",
+        "exemptHint": "When enabled, this tenant will never be billed."
+      }
+    },
+    "errors": {
+      "loadFailed": "Failed to load billing data.",
+      "payFailed": "Failed to generate payment invoice. Please try again.",
+      "saveFailed": "Failed to save settings."
+    }
   },
   "Attendance": {
     "title": "Attendance Management",

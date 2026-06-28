@@ -67,6 +67,9 @@
     "transactions": "Transaksi",
     "receipts": "Struk",
     "team": "Tim",
+    "billing": "Billing",
+    "billingNav": "Billing",
+    "billingConfigNav": "Konfigurasi Billing",
     "attendance": "Kehadiran",
     "leaves": "Cuti",
     "superAdmin": "Super Admin",
@@ -333,6 +336,113 @@
     "empty": "Tidak ada pengajuan cuti ditemukan",
     "emptyFiltered": "Tidak ada pengajuan cuti yang cocok dengan kriteria pencarian Anda.",
     "emptyNew": "Buat pengajuan cuti baru untuk memulai."
+  },
+  "Billing": {
+    "nav": "Billing",
+    "navConfig": "Konfigurasi Billing",
+    "title": "Billing & Subscription",
+    "subtitle": "Kelola subscription, invoice, dan pembayaran Anda.",
+    "status": {
+      "trialing": "Trial",
+      "active": "Aktif",
+      "suspended": "Disuspend",
+      "cancelled": "Dibatalkan",
+      "exempt": "Exempt"
+    },
+    "trialEndsIn": "Trial berakhir dalam {days} hari",
+    "trialEnded": "Trial Anda telah berakhir",
+    "currentInvoice": "Invoice Saat Ini",
+    "dueDate": "Jatuh tempo: {date}",
+    "overdue": "Terlambat",
+    "paid": "Lunas",
+    "payNow": "Bayar Sekarang",
+    "noActiveInvoice": "Tidak ada invoice aktif",
+    "estimate": "Estimasi Bulan Ini",
+    "estimateHint": "Estimasi real-time berdasarkan pemakaian bulan berjalan. Invoice final dibuat tanggal 5.",
+    "posCharge": "Charge POS",
+    "attendanceCharge": "Charge Attendance",
+    "discount": "Diskon",
+    "total": "Total",
+    "breakdown": {
+      "title": "Rincian",
+      "store": "Store",
+      "revenue": "Omzet",
+      "charge": "Charge",
+      "employees": "{count} karyawan aktif"
+    },
+    "history": "Riwayat Invoice",
+    "period": "Periode",
+    "amount": "Jumlah",
+    "method": "Metode",
+    "paidAt": "Dibayar Pada",
+    "noHistory": "Belum ada invoice",
+    "banner": {
+      "trialSoon": "Trial Anda berakhir dalam {days} hari. Berlangganan untuk mempertahankan semua fitur.",
+      "overdue": "Invoice sebesar {amount} jatuh tempo sejak {date}. Bayar sekarang untuk mengembalikan akses.",
+      "suspended": "Akun Anda disuspend. Bayar invoice tertunggak untuk mengembalikan akses ke riwayat & laporan.",
+      "exempt": "Tenant ini exempt dari billing."
+    },
+    "gate": {
+      "locked": "Terkunci",
+      "lockedTitle": "Akses Dikunci",
+      "lockedDesc": "Bayar invoice tertunggak untuk melihat riwayat transaksi dan laporan.",
+      "payToUnlock": "Bayar untuk Membuka"
+    },
+    "config": {
+      "title": "Konfigurasi Billing",
+      "tabProvider": "Payment Provider",
+      "tabPricing": "Pricing",
+      "tabDiscounts": "Diskon",
+      "tabTenants": "Tenants",
+      "provider": {
+        "active": "Provider Aktif",
+        "xendit": "Xendit",
+        "midtrans": "Midtrans",
+        "xenditSecret": "Xendit Secret Key",
+        "xenditVerify": "Xendit Verify Key",
+        "midtransServer": "Midtrans Server Key",
+        "midtransClient": "Midtrans Client Key",
+        "midtransProduction": "Midtrans Production Mode",
+        "webhookSecret": "Webhook Secret",
+        "save": "Simpan Pengaturan",
+        "saved": "Pengaturan berhasil disimpan."
+      },
+      "pricing": {
+        "posRate": "Tarif POS (%)",
+        "posBase": "Maks Charge POS per Store",
+        "attendanceRate": "Tarif Attendance per Karyawan",
+        "attendanceFree": "Karyawan Gratis Attendance",
+        "trialMonths": "Durasi Trial (bulan)",
+        "save": "Simpan Pricing",
+        "saved": "Pricing berhasil diperbarui."
+      },
+      "discount": {
+        "add": "Tambah Diskon",
+        "edit": "Edit Diskon",
+        "code": "Kode",
+        "name": "Nama",
+        "type": "Tipe",
+        "percentage": "Persentase",
+        "fixed": "Nominal Tetap",
+        "value": "Nilai",
+        "appliesTo": "Berlaku Untuk",
+        "startsAt": "Tanggal Mulai",
+        "endsAt": "Tanggal Berakhir (opsional)",
+        "active": "Aktif",
+        "save": "Simpan",
+        "delete": "Hapus",
+        "noDiscounts": "Belum ada diskon dikonfigurasi."
+      },
+      "tenant": {
+        "exempt": "Exempt dari billing",
+        "exemptHint": "Jika aktif, tenant ini tidak akan pernah ditagih."
+      }
+    },
+    "errors": {
+      "loadFailed": "Gagal memuat data billing.",
+      "payFailed": "Gagal membuat invoice pembayaran. Silakan coba lagi.",
+      "saveFailed": "Gagal menyimpan pengaturan."
+    }
   },
   "Attendance": {
     "title": "Manajemen Kehadiran",

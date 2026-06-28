@@ -38,6 +38,8 @@ import {
   CalendarOff,
   Shield,
   Receipt,
+  CreditCard,
+  Settings,
   type LucideIcon,
 } from 'lucide-react';
 import { Link, usePathname } from '@/i18n/navigation';
@@ -78,7 +80,12 @@ const teamNavigation: NavItem[] = [
   { href: '/leaves', icon: CalendarOff, role: 'user', labelKey: 'leaves' },
 ];
 
+const billingNavigation: NavItem[] = [
+  { href: '/billing', icon: CreditCard, role: 'user', labelKey: 'billingNav' },
+];
+
 const superAdminNavigation: NavItem[] = [
+  { href: '/billing-config', icon: Settings, role: 'super-admin', labelKey: 'billingConfigNav' },
   { href: '/permissions', icon: Shield, role: 'super-admin', labelKey: 'permissions' },
 ];
 
@@ -140,6 +147,10 @@ export default function AppSidebar() {
     canAccess(item.role, permissions),
   );
 
+  const accessibleBilling = billingNavigation.filter((item) =>
+    canAccess(item.role, permissions),
+  );
+
   const accessibleSuperAdmin = superAdminNavigation.filter((item) =>
     canAccess(item.role, permissions),
   );
@@ -149,6 +160,7 @@ export default function AppSidebar() {
     { id: 'transactions', title: t('transactions'), items: accessibleTransactions },
     { id: 'team', title: t('team'), items: accessibleTeam },
     { id: 'management', title: t('management'), items: accessibleManagement },
+    { id: 'billing', title: t('billing'), items: accessibleBilling },
   ];
 
   return (

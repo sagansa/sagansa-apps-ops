@@ -1298,6 +1298,120 @@ headers: { 'X-Tenant-ID': tenantId }
   async getRefund(refundId: string) {
     return this.request(`/refunds/${refundId}`);
   }
+
+  // ==========================================================================
+  // SUBSCRIPTION & BILLING (PRD-SUBSCRIPTION.md)
+  // ==========================================================================
+
+  /** Status subscription tenant aktif. */
+  async getSubscription() {
+    const res = await this.request('/billing/subscription');
+    return (res as { data?: Subscription })?.data ?? null;
+  }
+
+  /** Summary billing: status, tagihan aktif, estimasi, overdue. */
+  async getBillingDashboard() {
+    const res = await this.request('/billing/dashboard');
+    return (res as { data?: BillingDashboard })?.data ?? null;
+  }
+
+  /** List invoice (paginated, filter status). */
+  async getBillingCycles(params?: {
+    status?: BillingCycleStatus;
+    page?: number;
+    perPage?: number;
+  }) {
+    const searchParams = new URLSearchParams();
+    if (params?.status) searchParams.set('status', params.status);
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.perPage) searchParams.set('per_page', params.perPage.toString());
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    return this.request(`/billing/cycles${query}`);
+  }
+
+  /** Invoice bulan berjalan. */
+  async getCurrentBillingCycle() {
+    const res = await this.request('/billing/cycles/current');
+    return (res as { data?: BillingCycle })?.data ?? null;
+  }
+
+  /** Detail invoice + breakdown. */
+  async getBillingCycle(id: string) {
+    const res = await this.request(`/billing/cycles/${id}`);
+    return (res as { data?: BillingCycle })?.data ?? null;
+  }
+
+  /** Estimasi tagihan real-time bulan berjalan. */
+  async getBillingPreview() {
+    const res = await this.request('/billing/preview');
+    return (res as { data?: BillingPreview })?.data ?? null;
+  }
+
+  /** Generate/buat ulang provider invoice -> return provider_invoice_url. */
+  async payBillingCycle(id: string) {
+    const res = await this.request(`/billing/cycles/${id}/pay`, { method: 'POST' });
+    return (res as { data?: { provider_invoice_url: string } })?.data ?? null;
+  }
+
+  // ---- Super-Admin (role:super-admin) ----
+
+  async getBillingSettings() {
+    const res = await this.request('/billing/admin/settings');
+    return (res as { data?: BillingSettings })?.data ?? null;
+  }
+
+  async updateBillingSettings(payload: Partial<BillingSettings> & Record<string, unknown>) {
+    const res = await this.request('/billing/admin/settings', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+    return (res as { data?: BillingSettings })?.data ?? null;
+  }
+
+  async getPlans() {
+    const res = await this.request('/billing/admin/plans');
+    return ((res as { data?: Plan[] })?.data) ?? [];
+  }
+
+  async updatePlan(planId: string, payload: Partial<Plan> & Record<string, unknown>) {
+    const res = await this.request(`/billing/admin/plans/${planId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+    return (res as { data?: Plan })?.data ?? null;
+  }
+
+  async getDiscounts() {
+    const res = await this.request('/billing/admin/discounts');
+    return ((res as { data?: PlanDiscount[] })?.data) ?? [];
+  }
+
+  async createDiscount(payload: Partial<PlanDiscount> & Record<string, unknown>) {
+    const res = await this.request('/billing/admin/discounts', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return (res as { data?: PlanDiscount })?.data ?? null;
+  }
+
+  async updateDiscount(id: string, payload: Partial<PlanDiscount> & Record<string, unknown>) {
+    const res = await this.request(`/billing/admin/discounts/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+    return (res as { data?: PlanDiscount })?.data ?? null;
+  }
+
+  async deleteDiscount(id: string) {
+    return this.request(`/billing/admin/discounts/${id}`, { method: 'DELETE' });
+  }
+
+  async setTenantExemption(tenantId: string, exempt: boolean) {
+    return this.request(`/billing/admin/tenants/${tenantId}/exempt`, {
+      method: 'PUT',
+      body: JSON.stringify({ billing_exempt: exempt }),
+    });
+  }
 }
 
 const apiService = new ApiService();
@@ -1925,7 +2039,132 @@ export interface Tenant {
   shiftStores?: ShiftStore[];
   operation_mode?: 'standard' | 'foodcourt';
   foodcourt_config?: any;
+  // Billing
+  billing_exempt?: boolean;
+  subscription_status?: 'none' | 'trialing' | 'active' | 'suspended';
 }
+
+// ============================================================================
+// SUBSCRIPTION & BILLING TYPES (PRD-SUBSCRIPTION.md)
+// ============================================================================
+
+export interface Plan {
+  id: string;
+  code: string;
+  name: string;
+  pos_rate_percent: number;
+  pos_base_charge: number;
+  attendance_rate: number;
+  attendance_free_count: number;
+  trial_months: number;
+  is_active: boolean;
+}
+
+export interface PlanDiscount {
+  id: string;
+  plan_id: string;
+  code: string;
+  name: string;
+  type: 'percentage' | 'fixed';
+  value: number;
+  applies_to: 'pos' | 'attendance' | 'total';
+  starts_at: string;
+  ends_at: string | null;
+  is_active: boolean;
+}
+
+export type SubscriptionStatus = 'trialing' | 'active' | 'suspended' | 'cancelled' | 'exempt';
+
+export interface Subscription {
+  id: string;
+  tenant_id: string;
+  plan: Plan;
+  status: SubscriptionStatus;
+  trial_ends_at: string | null;
+  created_at: string;
+}
+
+export interface BillingPosBreakdownItem {
+  store_id: string;
+  store_name: string;
+  revenue: number;
+  charge: number;
+}
+
+export type BillingCycleStatus = 'draft' | 'issued' | 'paid' | 'overdue' | 'cancelled';
+
+export interface BillingCycle {
+  id: string;
+  tenant_id: string;
+  subscription_id: string;
+  plan_id: string;
+  period_year: number;
+  period_month: number;
+  pos_charge: number;
+  attendance_charge: number;
+  discount_amount: number;
+  total_charge: number;
+  pos_breakdown: BillingPosBreakdownItem[];
+  attendance_employees_count: number;
+  snapshot_plan: any;
+  status: BillingCycleStatus;
+  issued_at: string | null;
+  due_at: string | null;
+  paid_at: string | null;
+  payment_provider: string | null;
+  provider_invoice_id: string | null;
+  provider_invoice_url: string | null;
+  created_at: string;
+}
+
+export interface BillingPayment {
+  id: string;
+  billing_cycle_id: string;
+  amount: number;
+  method: string;
+  provider: string;
+  provider_payment_id: string | null;
+  paid_at: string | null;
+  metadata: any;
+}
+
+/** Estimasi real-time tagihan bulan berjalan (GET /billing/preview). */
+export interface BillingPreview {
+  period_year: number;
+  period_month: number;
+  pos_charge: number;
+  attendance_charge: number;
+  discount_amount: number;
+  total_charge: number;
+  pos_breakdown: BillingPosBreakdownItem[];
+  attendance_employees_count: number;
+  has_pos_usage: boolean;
+}
+
+/** Summary untuk dashboard billing. */
+export interface BillingDashboard {
+  subscription: Subscription;
+  current_cycle: BillingCycle | null;
+  preview: BillingPreview | null;
+  overdue_cycles: BillingCycle[];
+  is_suspended: boolean;
+  trial_days_remaining: number | null;
+}
+
+export type PaymentProvider = 'xendit' | 'midtrans';
+
+export interface BillingSettings {
+  id: string;
+  active_provider: PaymentProvider;
+  xendit_secret_key: string | null;
+  xendit_verify_key: string | null;
+  midtrans_server_key: string | null;
+  midtrans_client_key: string | null;
+  midtrans_is_production: boolean;
+  webhook_secret: string | null;
+}
+
+// ============================================================================
 
 export type TenantMembershipRole = 'owner' | 'admin' | 'member';
 
