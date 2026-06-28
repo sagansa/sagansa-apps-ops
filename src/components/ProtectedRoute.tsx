@@ -3,6 +3,7 @@
 import { useAuth } from '@/app/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 
 export default function ProtectedRoute({
   children,
@@ -11,8 +12,9 @@ export default function ProtectedRoute({
   children: React.ReactNode;
   requiredRole?: 'admin' | 'super-admin';
 }) {
-  const { user, isAuthenticated, loading, isAdmin, isSuperAdmin } = useAuth();
+  const { isAuthenticated, loading, isAdmin, isSuperAdmin } = useAuth();
   const router = useRouter();
+  const t = useTranslations('Common');
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -33,40 +35,21 @@ export default function ProtectedRoute({
   }
 
   // Check role requirements
-  if (requiredRole === 'super-admin' && !isSuperAdmin) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-600">Access Denied</h1>
-          <p className="mt-2 text-gray-600">You do not have permission to access this page.</p>
-          <div className="mt-4 p-4 bg-gray-100 rounded text-left text-xs font-mono">
-            <p>Debug Info:</p>
-            <p>Required Role: {requiredRole}</p>
-            <p>Current Roles: {user?.roles?.map(r => r.name).join(', ') || 'None'}</p>
-            <p>Is Admin: {isAdmin ? 'Yes' : 'No'}</p>
-            <p>Is Super Admin: {isSuperAdmin ? 'Yes' : 'No'}</p>
-          </div>
-        </div>
+  const denied = (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-center">
+        <h1 className="text-2xl font-bold text-red-600">{t('accessDenied')}</h1>
+        <p className="mt-2 text-gray-600">{t('permissionDenied')}</p>
       </div>
-    );
+    </div>
+  );
+
+  if (requiredRole === 'super-admin' && !isSuperAdmin) {
+    return denied;
   }
 
   if (requiredRole === 'admin' && !isAdmin && !isSuperAdmin) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-600">Access Denied</h1>
-          <p className="mt-2 text-gray-600">You do not have permission to access this page.</p>
-          <div className="mt-4 p-4 bg-gray-100 rounded text-left text-xs font-mono">
-            <p>Debug Info:</p>
-            <p>Required Role: {requiredRole}</p>
-            <p>Current Roles: {user?.roles?.map(r => r.name).join(', ') || 'None'}</p>
-            <p>Is Admin: {isAdmin ? 'Yes' : 'No'}</p>
-            <p>Is Super Admin: {isSuperAdmin ? 'Yes' : 'No'}</p>
-          </div>
-        </div>
-      </div>
-    );
+    return denied;
   }
 
   return <>{children}</>;

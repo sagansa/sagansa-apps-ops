@@ -40,46 +40,46 @@ import {
   Receipt,
   type LucideIcon,
 } from 'lucide-react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { Link, usePathname } from '@/i18n/navigation';
+import { useTranslations } from 'next-intl';
 import { useMemo } from 'react';
 
 type NavItem = {
-  name: string;
   href: string;
   icon: LucideIcon;
   role?: 'admin' | 'super-admin' | 'user';
+  labelKey: string;
 };
 
 const generalNavigation: NavItem[] = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, role: 'admin' },
+  { href: '/dashboard', icon: LayoutDashboard, role: 'admin', labelKey: 'dashboard' },
 ];
 
 const managementNavigation: NavItem[] = [
-  { name: 'Users', href: '/users', icon: Users, role: 'super-admin' },
-  { name: 'Team Members', href: '/team-members', icon: UserCheck, role: 'admin' },
-  { name: 'Stores', href: '/stores', icon: Store, role: 'admin' },
-  { name: 'Store Groups', href: '/store-groups', icon: Building2, role: 'admin' },
-  { name: 'Point of Sale', href: '/point-of-sale', icon: ShoppingCart, role: 'admin' },
-  { name: 'Shift Management', href: '/shift-management', icon: Clock, role: 'admin' },
+  { href: '/users', icon: Users, role: 'super-admin', labelKey: 'users' },
+  { href: '/team-members', icon: UserCheck, role: 'admin', labelKey: 'teamMembers' },
+  { href: '/stores', icon: Store, role: 'admin', labelKey: 'stores' },
+  { href: '/store-groups', icon: Building2, role: 'admin', labelKey: 'storeGroups' },
+  { href: '/point-of-sale', icon: ShoppingCart, role: 'admin', labelKey: 'pointOfSale' },
+  { href: '/shift-management', icon: Clock, role: 'admin', labelKey: 'shiftManagement' },
 ];
 
 const reportsNavigation: NavItem[] = [
-  { name: 'Sales Summary', href: '/reports/summary', icon: BarChart3, role: 'user' },
-  { name: 'Sales Chart', href: '/reports/chart', icon: TrendingUp, role: 'user' },
+  { href: '/reports/summary', icon: BarChart3, role: 'user', labelKey: 'salesSummary' },
+  { href: '/reports/chart', icon: TrendingUp, role: 'user', labelKey: 'salesChart' },
 ];
 
 const transactionsNavigation: NavItem[] = [
-  { name: 'Receipts', href: '/transactions', icon: Receipt, role: 'user' },
+  { href: '/transactions', icon: Receipt, role: 'user', labelKey: 'receipts' },
 ];
 
 const teamNavigation: NavItem[] = [
-  { name: 'Attendance', href: '/attendance', icon: CalendarCheck, role: 'user' },
-  { name: 'Leaves', href: '/leaves', icon: CalendarOff, role: 'user' },
+  { href: '/attendance', icon: CalendarCheck, role: 'user', labelKey: 'attendance' },
+  { href: '/leaves', icon: CalendarOff, role: 'user', labelKey: 'leaves' },
 ];
 
 const superAdminNavigation: NavItem[] = [
-  { name: 'Permissions', href: '/permissions', icon: Shield, role: 'super-admin' },
+  { href: '/permissions', icon: Shield, role: 'super-admin', labelKey: 'permissions' },
 ];
 
 function canAccess(
@@ -107,6 +107,9 @@ function canAccess(
 
 export default function AppSidebar() {
   const { user, isAdmin, isSuperAdmin } = useAuth();
+  const t = useTranslations('Nav');
+  const tBrand = useTranslations('Common.brand');
+  // next-intl pathname returns the path WITHOUT the locale prefix
   const pathname = usePathname();
   const isUser =
     user?.roles?.some((role) => role.name === 'user') ||
@@ -142,37 +145,45 @@ export default function AppSidebar() {
   );
 
   const collapsibleSections = [
-    { id: 'reports', title: 'Reports', items: accessibleReports },
-    { id: 'transactions', title: 'Transactions', items: accessibleTransactions },
-    { id: 'team', title: 'Team', items: accessibleTeam },
-    { id: 'management', title: 'Admin Management', items: accessibleManagement },
+    { id: 'reports', title: t('reports'), items: accessibleReports },
+    { id: 'transactions', title: t('transactions'), items: accessibleTransactions },
+    { id: 'team', title: t('team'), items: accessibleTeam },
+    { id: 'management', title: t('management'), items: accessibleManagement },
   ];
 
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <div className="flex items-center gap-2 px-2 py-1">
-          <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-            <div className="font-bold">A</div>
-          </div>
-          <div className="grid flex-1 text-left text-sm leading-tight">
-            <span className="truncate font-semibold">Admin Panel</span>
-            <span className="truncate text-xs">Management</span>
-          </div>
-        </div>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              size="lg"
+              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+              tooltip={tBrand('name')}
+            >
+              <div className="flex aspect-square size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-600 to-purple-600 text-white">
+                <span className="text-base font-black leading-none">S</span>
+              </div>
+              <div className="grid flex-1 text-left text-sm leading-tight">
+                <span className="truncate font-bold tracking-tight">{tBrand('name')}</span>
+                <span className="truncate text-xs text-indigo-500 dark:text-indigo-400">{tBrand('tagline')}</span>
+              </div>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
         {accessibleGeneral.length > 0 && (
           <SidebarGroup>
-            <SidebarGroupLabel>General</SidebarGroupLabel>
+            <SidebarGroupLabel>{t('general')}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {accessibleGeneral.map((item) => (
-                  <SidebarMenuItem key={item.name}>
-                    <SidebarMenuButton asChild isActive={pathname === item.href} tooltip={item.name}>
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton asChild isActive={pathname === item.href} tooltip={t(item.labelKey)}>
                       <Link href={item.href}>
                         <item.icon className="size-4" />
-                        <span>{item.name}</span>
+                        <span>{t(item.labelKey)}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -201,11 +212,11 @@ export default function AppSidebar() {
                   <SidebarGroupContent>
                     <SidebarMenu>
                       {section.items.map((item) => (
-                        <SidebarMenuItem key={item.name}>
-                          <SidebarMenuButton asChild isActive={pathname === item.href} tooltip={item.name}>
+                        <SidebarMenuItem key={item.href}>
+                          <SidebarMenuButton asChild isActive={pathname === item.href} tooltip={t(item.labelKey)}>
                             <Link href={item.href}>
                               <item.icon className="size-4" />
-                              <span>{item.name}</span>
+                              <span>{t(item.labelKey)}</span>
                             </Link>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
@@ -220,15 +231,15 @@ export default function AppSidebar() {
 
         {accessibleSuperAdmin.length > 0 && (
           <SidebarGroup>
-            <SidebarGroupLabel>Super Admin</SidebarGroupLabel>
+            <SidebarGroupLabel>{t('superAdmin')}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {accessibleSuperAdmin.map((item) => (
-                  <SidebarMenuItem key={item.name}>
-                    <SidebarMenuButton asChild isActive={pathname === item.href} tooltip={item.name}>
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton asChild isActive={pathname === item.href} tooltip={t(item.labelKey)}>
                       <Link href={item.href}>
                         <item.icon className="size-4" />
-                        <span>{item.name}</span>
+                        <span>{t(item.labelKey)}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

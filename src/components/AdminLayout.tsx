@@ -45,7 +45,7 @@ export default function AdminLayout({
           </div>
         </header>
         <main className="flex-1 overflow-y-auto bg-slate-50 p-4">
-          <div className="mx-auto w-full max-w-7xl">{children}</div>
+          <div className="mx-auto w-full max-w-6xl">{children}</div>
         </main>
       </SidebarInset>
     </SidebarProvider>

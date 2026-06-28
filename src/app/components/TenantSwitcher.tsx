@@ -4,9 +4,11 @@ import { Fragment } from 'react';
 import { ChevronDown, Building2, Check } from 'lucide-react';
 import { useAuth } from '@/app/contexts/AuthContext';
 import { Menu, Transition } from '@headlessui/react';
+import { useTranslations } from 'next-intl';
 
 export default function TenantSwitcher() {
     const { activeTenant, availableTenants, switchTenant, user } = useAuth();
+    const t = useTranslations('Common');
 
     if (!user) return null;
 
@@ -28,7 +30,7 @@ export default function TenantSwitcher() {
             await switchTenant(tenantId);
         } catch (error) {
             console.error('Failed to switch tenant:', error);
-            alert('Failed to switch tenant. Please try again.');
+            alert(t('failedSwitchTenant'));
         }
     };
 
@@ -46,7 +48,7 @@ export default function TenantSwitcher() {
                     <Building2 className="h-5 w-5 text-gray-400 mr-3 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
                         <div className="text-sm font-semibold text-gray-900 truncate">
-                            {activeTenant?.name || 'Select Tenant'}
+                            {activeTenant?.name || t('selectTenant')}
                         </div>
                         {activeTenant && (
                             <div className="text-xs text-gray-500 truncate">
